@@ -1,200 +1,237 @@
-import React, {useState} from 'react';
+import React, {useEffect} from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
+import Svg, {
+  Circle,
+  Line,
+  Polyline,
+  Text as SvgText,
+  G,
+} from 'react-native-svg';
+import {useNavigation} from '@react-navigation/native';
+import {useEnergyStore, usePointStore} from '../store/store';
+import {useAuthStore} from '../store/authStore';
 
-const categories = ['전체', 'DR', '냉난방', '가전', '종합'];
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
+const CHART_WIDTH = SCREEN_WIDTH - 80;
+const CHART_HEIGHT = 180;
+const timeLabels = ['06', '08', '10', '12', '14', '16', '18', '20'];
 
-const missions = [
-  {
-    id: 1,
-    icon: '🌡️',
-    title: '에어컨 1도 올리기',
-    desc: '냉방 온도를 26°C 이상으로 설정',
-    points: 50,
-    progress: 3,
-    total: 5,
-    unit: '일',
-    completed: false,
-    category: '냉난방',
-  },
-  {
-    id: 2,
-    icon: '✅',
-    title: '대기전력 차단',
-    desc: '미사용 전자기기 플러그 뽑기',
-    points: 30,
-    progress: 7,
-    total: 7,
-    unit: '일',
-    completed: true,
-    category: '가전',
-  },
-  {
-    id: 3,
-    icon: '⏰',
-    title: '피크시간 절전',
-    desc: '14~17시 전력 사용량 20% 줄이기',
-    points: 100,
-    progress: 2,
-    total: 5,
-    unit: '회',
-    completed: false,
-    category: 'DR',
-  },
-  {
-    id: 4,
-    icon: '🧺',
-    title: '세탁기 모아 돌리기',
-    desc: '주 2회 이하로 세탁기 사용',
-    points: 40,
-    progress: 1,
-    total: 4,
-    unit: '주',
-    completed: false,
-    category: '가전',
-  },
-  {
-    id: 5,
-    icon: '📊',
-    title: '월간 10% 절감 달성',
-    desc: '전월 대비 전력 사용량 10% 감소',
-    points: 200,
-    progress: 0,
-    total: 1,
-    unit: '회',
-    completed: false,
-    category: '종합',
-  },
-];
+const EnergyChart = () => {
+  const {hourlyActual, hourlyPredicted} = useEnergyStore();
+  const maxVal = 8;
+  const padLeft = 40;
+  const padTop = 10;
+  const padBottom = 30;
+  const chartW = CHART_WIDTH - padLeft;
+  const chartH = CHART_HEIGHT - padTop - padBottom;
 
-const MissionCard = ({mission}) => {
-  const percent = (mission.progress / mission.total) * 100;
-  const isCompleted = mission.completed;
+  const getX = (i) => padLeft + (i / (hourlyActual.length - 1)) * chartW;
+  const getY = (val) => padTop + chartH - (val / maxVal) * chartH;
+
+  const actualPoints = hourlyActual.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
+  const predictedPoints = hourlyPredicted.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
+
+  const yLabels = ['0kW', '2kW', '4kW', '6kW', '8kW'];
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.missionCard,
-        isCompleted && styles.missionCardCompleted,
-      ]}>
-      <View style={styles.missionHeader}>
-        <View style={styles.missionIconCircle}>
-          <Text style={{fontSize: 20}}>{mission.icon}</Text>
-        </View>
-        <View style={styles.missionInfo}>
-          <Text
-            style={[
-              styles.missionTitle,
-              isCompleted && styles.missionTitleCompleted,
-            ]}>
-            {mission.title}
-          </Text>
-          <Text style={styles.missionDesc}>{mission.desc}</Text>
-        </View>
-        <View style={styles.pointBadge}>
-          <Text style={styles.pointBadgeText}>+{mission.points}P</Text>
-        </View>
-        <Text style={styles.chevron}>›</Text>
-      </View>
-
-      <View style={styles.missionProgress}>
-        <View style={styles.progressBg}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${percent}%`,
-                backgroundColor: isCompleted ? '#22C55E' : '#22C55E',
-              },
-            ]}
-          />
-        </View>
-        <Text style={styles.progressText}>
-          {mission.progress}/{mission.total}{mission.unit}
-        </Text>
-      </View>
-
-      {isCompleted && (
-        <View style={styles.completedBadge}>
-          <Text style={styles.completedIcon}>☑️</Text>
-          <Text style={styles.completedText}>미션 완료! 포인트가 적립되었습니다</Text>
-        </View>
-      )}
-    </TouchableOpacity>
+    <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+      {yLabels.map((label, i) => {
+        const y = padTop + chartH - (i / 4) * chartH;
+        return (
+          <G key={`y-${i}`}>
+            <Line x1={padLeft} y1={y} x2={padLeft + chartW} y2={y}
+              stroke="#E5E7EB" strokeWidth={0.5} strokeDasharray="4,4" />
+            <SvgText x={padLeft - 5} y={y + 4} fontSize={10} fill="#9CA3AF" textAnchor="end">
+              {label}
+            </SvgText>
+          </G>
+        );
+      })}
+      {timeLabels.map((label, i) => {
+        const x = padLeft + (i / (timeLabels.length - 1)) * chartW;
+        return (
+          <SvgText key={`x-${i}`} x={x} y={CHART_HEIGHT - 5}
+            fontSize={10} fill="#9CA3AF" textAnchor="middle">{label}</SvgText>
+        );
+      })}
+      <Polyline points={predictedPoints} fill="none" stroke="#D1D5DB"
+        strokeWidth={2} strokeDasharray="6,4" />
+      <Polyline points={actualPoints} fill="none" stroke="#22C55E" strokeWidth={2.5} />
+      {hourlyActual.map((v, i) => (
+        <Circle key={`dot-${i}`} cx={getX(i)} cy={getY(v)} r={3} fill="#22C55E" />
+      ))}
+    </Svg>
   );
 };
 
-const MissionScreen = () => {
-  const [selectedCategory, setSelectedCategory] = useState('전체');
+const DonutChart = ({value, maxValue, size = 120}) => {
+  const strokeWidth = 10;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (value / maxValue) * circumference;
+  const center = size / 2;
 
-  const completedCount = missions.filter(m => m.completed).length;
-  const totalPoints = missions.filter(m => m.completed).reduce((sum, m) => sum + m.points, 0);
+  return (
+    <View style={{width: size, height: size, alignItems: 'center', justifyContent: 'center'}}>
+      <Svg width={size} height={size}>
+        <Circle cx={center} cy={center} r={radius} stroke="#E5E7EB"
+          strokeWidth={strokeWidth} fill="none" />
+        <Circle cx={center} cy={center} r={radius} stroke="#22C55E"
+          strokeWidth={strokeWidth} fill="none"
+          strokeDasharray={`${progress},${circumference}`}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${center} ${center})`} />
+      </Svg>
+      <View style={styles.donutCenter}>
+        <Text style={styles.donutValue}>{value}</Text>
+        <Text style={styles.donutUnit}>kWh</Text>
+      </View>
+    </View>
+  );
+};
 
-  const filteredMissions =
-    selectedCategory === '전체'
-      ? missions
-      : missions.filter(m => m.category === selectedCategory);
+const HomeScreen = () => {
+  const navigation = useNavigation();
+  const {
+    currentPower, todayAccumulated, monthlyTarget, monthlyUsed,
+    savingPercent, monthlySaving, co2Reduction, simulateRealtime,
+  } = useEnergyStore();
+  const {totalPoints} = usePointStore();
+  const {user} = useAuthStore();
+
+  const userName = user?.name || '김에너지';
+  const userLocation = user?.location || '강원도 춘천시';
+
+  const monthlyPercent = Math.round((monthlyUsed / monthlyTarget) * 100);
+
+  // 실시간 데이터 시뮬레이션 시작
+  useEffect(() => {
+    const interval = simulateRealtime();
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* 헤더 */}
-        <Text style={styles.pageTitle}>에너지 미션</Text>
-        <Text style={styles.pageSubtitle}>미션을 달성하고 포인트를 적립하세요</Text>
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <View style={styles.headerIcon}>
+              <Text style={{fontSize: 20}}>🌿</Text>
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>에너지 대시보드</Text>
+              <Text style={styles.headerSubtitle}>{userLocation} · {userName}님</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.notificationBtn}
+            onPress={() => navigation.navigate('마이페이지')}>
+            <Text style={{fontSize: 18}}>🔔</Text>
+            <View style={styles.notificationBadge} />
+          </TouchableOpacity>
+        </View>
 
-        {/* 상단 통계 */}
-        <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={{fontSize: 22}}>🏆</Text>
-            <Text style={styles.statValue}>
-              {completedCount}/{missions.length}
-            </Text>
-            <Text style={styles.statLabel}>완료 미션</Text>
+        {/* DR 이벤트 배너 → DR 이벤트 탭으로 이동 */}
+        <TouchableOpacity
+          style={styles.drBanner}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('DR 이벤트')}>
+          <View style={styles.drBannerContent}>
+            <View style={styles.drLiveIndicator}>
+              <View style={styles.liveRedDot} />
+              <Text style={styles.drLiveText}>DR 이벤트 진행 중</Text>
+            </View>
+            <Text style={styles.drTimeText}>14:00 ~ 17:00 전력 피크 절감</Text>
+            <Text style={styles.drParticipateText}>참여하고 500P 받기 →</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={{fontSize: 22}}>⭐</Text>
-            <Text style={styles.statValue}>{totalPoints}P</Text>
-            <Text style={styles.statLabel}>획득 포인트</Text>
+          <View style={styles.drBannerIcon}>
+            <Text style={{fontSize: 28, color: '#FFFFFF'}}>♻️</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={{fontSize: 22}}>🔥</Text>
-            <Text style={styles.statValue}>3일</Text>
-            <Text style={styles.statLabel}>연속 달성</Text>
+        </TouchableOpacity>
+
+        {/* 실시간 전력 사용량 (실시간 업데이트) */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>실시간 전력 사용량</Text>
+          <View style={styles.realTimeRow}>
+            <DonutChart value={currentPower} maxValue={10} />
+            <View style={styles.realTimeStats}>
+              <View style={styles.statRow}>
+                <Text style={styles.statLabel}>오늘 누적</Text>
+                <Text style={styles.statValue}>{todayAccumulated.toFixed(1)} kWh</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, {width: `${Math.min((todayAccumulated / 30) * 100, 100)}%`}]} />
+              </View>
+              <View style={[styles.statRow, {marginTop: 12}]}>
+                <Text style={styles.statLabel}>월 목표 대비</Text>
+                <Text style={styles.statValue}>{monthlyPercent}%</Text>
+              </View>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, {width: `${monthlyPercent}%`, backgroundColor: '#3B82F6'}]} />
+              </View>
+              <View style={styles.savingBadge}>
+                <Text style={{fontSize: 12}}>🌱</Text>
+                <Text style={styles.savingText}>어제보다 {savingPercent}% 절감 중!</Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* 카테고리 필터 */}
-        <View style={styles.categoryRow}>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.categoryBtn,
-                selectedCategory === cat && styles.categoryBtnActive,
-              ]}
-              onPress={() => setSelectedCategory(cat)}>
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === cat && styles.categoryTextActive,
-                ]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        {/* 시간대별 전력 사용량 차트 */}
+        <View style={styles.card}>
+          <View style={styles.chartHeader}>
+            <Text style={styles.cardTitle}>시간대별 전력 사용량</Text>
+            <View style={styles.chartLegend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, {backgroundColor: '#22C55E'}]} />
+                <Text style={styles.legendText}>실제</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, {backgroundColor: '#D1D5DB'}]} />
+                <Text style={styles.legendText}>AI 예측</Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.chartContainer}>
+            <EnergyChart />
+          </View>
         </View>
 
-        {/* 미션 목록 */}
-        {filteredMissions.map(mission => (
-          <MissionCard key={mission.id} mission={mission} />
-        ))}
+        {/* 하단 요약 카드 → 각 탭으로 이동 */}
+        <View style={styles.summaryRow}>
+          <TouchableOpacity
+            style={styles.summaryCard}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('DR 이벤트')}>
+            <Text style={{fontSize: 22}}>⚡</Text>
+            <Text style={styles.summaryValue}>{monthlySaving} kWh</Text>
+            <Text style={styles.summaryLabel}>이번 달 절감</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.summaryCard}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('마이페이지')}>
+            <Text style={{fontSize: 22}}>🌍</Text>
+            <Text style={styles.summaryValue}>{co2Reduction} kg</Text>
+            <Text style={styles.summaryLabel}>CO₂ 감축</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.summaryCard}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('포인트')}>
+            <Text style={{fontSize: 22}}>🎁</Text>
+            <Text style={styles.summaryValue}>{totalPoints.toLocaleString()}P</Text>
+            <Text style={styles.summaryLabel}>적립 포인트</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={{height: 20}} />
       </ScrollView>
@@ -203,178 +240,47 @@ const MissionScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 20,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  pageSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#ECFDF5',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 4,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  // Category
-  categoryRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-  },
-  categoryBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  categoryBtnActive: {
-    backgroundColor: '#22C55E',
-    borderColor: '#22C55E',
-  },
-  categoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  categoryTextActive: {
-    color: '#FFFFFF',
-  },
-  // Mission card
-  missionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  missionCardCompleted: {
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  missionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  missionIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  missionInfo: {
-    flex: 1,
-  },
-  missionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  missionTitleCompleted: {
-    color: '#16A34A',
-  },
-  missionDesc: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  pointBadge: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 8,
-  },
-  pointBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#16A34A',
-  },
-  chevron: {
-    fontSize: 20,
-    color: '#9CA3AF',
-  },
-  // Progress
-  missionProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    gap: 10,
-  },
-  progressBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '500',
-    minWidth: 40,
-    textAlign: 'right',
-  },
-  // Completed
-  completedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  completedIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  completedText: {
-    fontSize: 12,
-    color: '#16A34A',
-    fontWeight: '600',
-  },
+  container: {flex: 1, backgroundColor: '#F9FAFB'},
+  scrollContent: {paddingHorizontal: 16, paddingTop: 50, paddingBottom: 20},
+  header: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16},
+  headerLeft: {flexDirection: 'row', alignItems: 'center'},
+  headerIcon: {width: 44, height: 44, borderRadius: 22, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center', marginRight: 10},
+  headerTitle: {fontSize: 20, fontWeight: '700', color: '#111827'},
+  headerSubtitle: {fontSize: 13, color: '#6B7280', marginTop: 2},
+  notificationBtn: {width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', position: 'relative', shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 3, elevation: 2},
+  notificationBadge: {position: 'absolute', top: 8, right: 10, width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444'},
+  drBanner: {backgroundColor: '#22C55E', borderRadius: 16, padding: 18, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  drBannerContent: {flex: 1},
+  drLiveIndicator: {flexDirection: 'row', alignItems: 'center', marginBottom: 6},
+  liveRedDot: {width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', marginRight: 6},
+  drLiveText: {fontSize: 13, color: '#FFFFFF', fontWeight: '500'},
+  drTimeText: {fontSize: 18, fontWeight: '700', color: '#FFFFFF', marginBottom: 4},
+  drParticipateText: {fontSize: 13, color: '#DCFCE7', fontWeight: '500'},
+  drBannerIcon: {width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center'},
+  card: {backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
+  cardTitle: {fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 16},
+  realTimeRow: {flexDirection: 'row', alignItems: 'center'},
+  donutCenter: {position: 'absolute', alignItems: 'center'},
+  donutValue: {fontSize: 28, fontWeight: '700', color: '#111827'},
+  donutUnit: {fontSize: 12, color: '#6B7280', marginTop: -2},
+  realTimeStats: {flex: 1, marginLeft: 20},
+  statRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6},
+  statLabel: {fontSize: 13, color: '#6B7280'},
+  statValue: {fontSize: 15, fontWeight: '700', color: '#111827'},
+  progressBarBg: {height: 6, backgroundColor: '#E5E7EB', borderRadius: 3, overflow: 'hidden'},
+  progressBarFill: {height: '100%', backgroundColor: '#22C55E', borderRadius: 3},
+  savingBadge: {flexDirection: 'row', alignItems: 'center', marginTop: 12},
+  savingText: {fontSize: 12, color: '#22C55E', fontWeight: '600', marginLeft: 4},
+  chartHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8},
+  chartLegend: {flexDirection: 'row', gap: 12},
+  legendItem: {flexDirection: 'row', alignItems: 'center'},
+  legendDot: {width: 8, height: 8, borderRadius: 4, marginRight: 4},
+  legendText: {fontSize: 11, color: '#6B7280'},
+  chartContainer: {alignItems: 'center', paddingTop: 8},
+  summaryRow: {flexDirection: 'row', gap: 10},
+  summaryCard: {flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, paddingVertical: 16, alignItems: 'center', shadowColor: '#000', shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2},
+  summaryValue: {fontSize: 16, fontWeight: '700', color: '#111827', marginTop: 6},
+  summaryLabel: {fontSize: 11, color: '#6B7280', marginTop: 2},
 });
 
-export default MissionScreen;
+export default HomeScreen;
