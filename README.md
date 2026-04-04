@@ -5,14 +5,18 @@ PostgreSQL (RDB) - MSA 백엔드 API (Spring Boot/Node.js 기반 Mission/Reward 
 
 파일 배치 
 
-├── App.js                        
+├── App.js                         
 ├── store\
-│   └── store.js                 
+│   ├── store.js                    
+│   └── authStore.js               
 ├── components\
-│   └── Modals.js          
+│   └── Modals.js                  
 ├── screens\
-│   ├── HomeScreen.js               
-│   ├── DREventScreen.js           
-│   ├── MissionScreen.js            
-│   ├── PointScreen.js            
-│   └── MyPageScreen.js 
+│   ├── LoginScreen.js              
+│   ├── SignUpScreen.js             
+│   ├── SignUpCompleteScreen.js      
+│   ├── HomeScreen.js                
+│   ├── DREventScreen.js                
+│   ├── MissionScreen.js  
+│   ├── PointScreen.js
+│   └── MyPageScreen.js  
