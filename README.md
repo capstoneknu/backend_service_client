@@ -8,7 +8,7 @@ PostgreSQL (RDB) - MSA 백엔드 API (Spring Boot/Node.js 기반 Mission/Reward 
 ├── App.js                        
 ├── store\
 │   └── store.js                 
-├── components
+├── components\
 │   └── Modals.js          
 ├── screens\
 │   ├── HomeScreen.js               
