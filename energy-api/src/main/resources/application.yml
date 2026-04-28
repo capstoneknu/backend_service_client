@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: energy-api
+
+  # ======== H2 개발용 DB ========
+  datasource:
+    url: jdbc:h2:mem:energydb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.H2Dialect
+
+  # ======== MySQL 운영용 (필요 시 주석 해제) ========
+  # datasource:
+  #   url: jdbc:mysql://localhost:3306/energydb?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
+  #   username: root
+  #   password: your_password
+  # jpa:
+  #   hibernate:
+  #     ddl-auto: update
+  #   properties:
+  #     hibernate:
+  #       dialect: org.hibernate.dialect.MySQLDialect
+
+# ======== JWT 설정 ========
+jwt:
+  secret: energy-dashboard-capstone-jwt-secret-key-2024-must-be-at-least-256-bits-long
+  expiration: 86400000  # 24시간 (ms)
+
+# ======== 서버 설정 ========
+server:
+  port: 8080
