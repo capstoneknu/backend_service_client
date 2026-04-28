@@ -41,8 +41,8 @@ src/main/java/com/energy/api/
 │   ├── UserRepository.java          
 │   ├── EnergyDataRepository.java     
 │   ├── DREventRepository.java        
-│   ├── DRParticipationRepository.java 
-│   ├── MissionRepository.java       
+│   ├── DRParticipationRepository.java
+│   ├── MissionRepository.java    
 │   ├── MissionProgressRepository.java
 │   └── PointHistoryRepository.java   
 └── service/
