@@ -20,3 +20,33 @@ PostgreSQL (RDB) - MSA 백엔드 API (Spring Boot/Node.js 기반 Mission/Reward 
 │   ├── MissionScreen.js  
 │   ├── PointScreen.js
 │   └── MyPageScreen.js  
+
+
+src/main/java/com/energy/api/
+├── config/
+│   ├── JwtAuthenticationFilter.java  
+│   └── DataInitializer.java         
+├── controller/
+│   └── EnergyController.java          
+├── dto/
+│   └── AuthDto.java                  
+├── entity/
+│   ├── EnergyData.java                
+│   ├── DREvent.java                   
+│   ├── DRParticipation.java          
+│   ├── Mission.java                 
+│   ├── MissionProgress.java         
+│   └── PointHistory.java           
+├── repository/
+│   ├── UserRepository.java          
+│   ├── EnergyDataRepository.java     
+│   ├── DREventRepository.java        
+│   ├── DRParticipationRepository.java 
+│   ├── MissionRepository.java       
+│   ├── MissionProgressRepository.java
+│   └── PointHistoryRepository.java   
+└── service/
+    ├── EnergyService.java           
+    ├── DREventService.java           
+    ├── MissionService.java          
+    └── PointService.java           
