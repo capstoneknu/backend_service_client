@@ -5,7 +5,7 @@
 // 에뮬레이터에서 localhost 접근 시: 10.0.2.2
 // 실제 기기에서 접근 시: PC의 실제 IP 주소로 변경
 // 예: const BASE_URL = 'http://192.168.0.10:8080';
-const BASE_URL = 'http://10.0.2.2:8080';
+const BASE_URL = 'http://10.0.2.2:8081';
 
 // JWT 토큰 저장 (메모리)
 // 나중에 AsyncStorage로 교체 가능

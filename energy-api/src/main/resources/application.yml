@@ -2,45 +2,44 @@ spring:
   application:
     name: energy-api
 
-  # ======== H2 개발용 DB ========
+  # ======== MySQL 설정 ========
   datasource:
-    url: jdbc:h2:mem:energydb
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
-
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+    url: jdbc:mysql://localhost:3306/energydb?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: energy
+    password: energy1234
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.H2Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
 
-  # ======== MySQL 운영용 (필요 시 주석 해제) ========
-  # datasource:
-  #   url: jdbc:mysql://localhost:3306/energydb?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-  #   driver-class-name: com.mysql.cj.jdbc.Driver
-  #   username: root
-  #   password: your_password
-  # jpa:
-  #   hibernate:
-  #     ddl-auto: update
-  #   properties:
-  #     hibernate:
-  #       dialect: org.hibernate.dialect.MySQLDialect
+  # H2 콘솔 비활성화
+  h2:
+    console:
+      enabled: false
 
-# ======== JWT 설정 ========
+  # Kafka 설정 (A파트의 Kafka 사용)
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: spring-backend-group
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+# JWT 설정
 jwt:
   secret: energy-dashboard-capstone-jwt-secret-key-2024-must-be-at-least-256-bits-long
-  expiration: 86400000  # 24시간 (ms)
+  expiration: 86400000
 
-# ======== 서버 설정 ========
+# 서버 포트
 server:
-  port: 8080
+  port: 8081

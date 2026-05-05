@@ -31,16 +31,15 @@ public class SecurityConfig {
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // 인증 없이 접근 가능한 경로
                 .requestMatchers(
                     "/api/auth/login",
                     "/api/auth/signup",
-                    "/h2-console/**"
+                    "/h2-console/**",
+                    "/ws/**"                // WebSocket 경로 허용
                 ).permitAll()
-                // 나머지는 인증 필요
                 .anyRequest().authenticated()
             )
-            .headers(headers -> headers.frameOptions(f -> f.disable())) // H2 콘솔용
+            .headers(headers -> headers.frameOptions(f -> f.disable()))
             .addFilterBefore(jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class);
 

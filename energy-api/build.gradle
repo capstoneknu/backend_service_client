@@ -28,8 +28,14 @@ dependencies {
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
 
     // Database
-    runtimeOnly 'com.h2database:h2'           // 개발용
-    runtimeOnly 'com.mysql:mysql-connector-j'  // 운영용
+    runtimeOnly 'com.h2database:h2'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // Kafka (A파트 Kafka 연동)
+    implementation 'org.springframework.kafka:spring-kafka'
+
+    // WebSocket (앱 실시간 전송)
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

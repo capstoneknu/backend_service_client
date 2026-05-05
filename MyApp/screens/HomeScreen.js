@@ -1,3 +1,4 @@
+import {useEnergyWebSocket} from '../api/useWebSocket';
 import React, {useEffect} from 'react';
 import {
   View,
@@ -102,6 +103,7 @@ const DonutChart = ({value, maxValue, size = 120}) => {
 };
 
 const HomeScreen = () => {
+  useEnergyWebSocket();
   const navigation = useNavigation();
   const {
     currentPower, todayAccumulated, monthlyTarget, monthlyUsed,
