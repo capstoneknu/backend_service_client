@@ -20,58 +20,118 @@ import {useNavigation} from '@react-navigation/native';
 import {useEnergyStore, usePointStore} from '../store/store';
 import {useAuthStore} from '../store/authStore';
 
+// 아키텍처 해상도 교정: 컨테이너 패딩(16px*2) + 카드 패딩(20px*2) = 총 72px 여백 확보
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
-const CHART_WIDTH = SCREEN_WIDTH - 80;
-const CHART_HEIGHT = 180;
-const timeLabels = ['06', '08', '10', '12', '14', '16', '18', '20'];
+const CHART_WIDTH = SCREEN_WIDTH - 72; 
+const CHART_HEIGHT = 220; // 렌더링 최적화 높이
 
+// 75:25 비율 및 뭉침 방지 엔진이 탑재된 차트 컴포넌트
 const EnergyChart = () => {
-  const {hourlyActual, hourlyPredicted} = useEnergyStore();
-
+  const { hourlyActual, hourlyPredicted } = useEnergyStore();
+   
   if (!hourlyActual || hourlyActual.length === 0) return null;
-
-  const maxVal = 8;
+   
+  const safeActual = hourlyActual.map(v => isNaN(Number(v)) ? 0 : Number(v));
+  const safePredicted = (hourlyPredicted || []).map(v => isNaN(Number(v)) ? 0 : Number(v));
+   
+  const actualLen = safeActual.length;
+  const displayPredLen = Math.max(Math.floor(actualLen / 3), 1); 
+  const displayPredicted = safePredicted.slice(0, displayPredLen);
+  const predLen = displayPredicted.length;
+   
+  const maxActual = Math.max(...safeActual);
+  const maxPred = Math.max(...(predLen > 0 ? displayPredicted : [0]));
+  const dynamicMaxVal = Math.max(maxActual, maxPred) * 1.5 || 1;
+   
   const padLeft = 40;
   const padTop = 10;
-  const padBottom = 30;
+  const padBottom = 35; 
   const chartW = CHART_WIDTH - padLeft;
   const chartH = CHART_HEIGHT - padTop - padBottom;
-
-  const getX = (i) => padLeft + (i / (hourlyActual.length - 1)) * chartW;
-  const getY = (val) => padTop + chartH - (val / maxVal) * chartH;
-
-  const actualPoints = hourlyActual.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
-  const predictedPoints = hourlyPredicted.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
-
-  const yLabels = ['0kW', '2kW', '4kW', '6kW', '8kW'];
-
+   
+  const actualW = chartW * 0.75; 
+  const predW = chartW * 0.25;
+   
+  const getActualX = (i) => {
+    if (actualLen <= 1) return padLeft + actualW; 
+    return padLeft + (i / (actualLen - 1)) * actualW;
+  };
+   
+  const getPredX = (i) => {
+    if (predLen === 0) return padLeft + actualW;
+    return padLeft + actualW + (i / predLen) * predW; 
+  };
+   
+  const getY = (val) => padTop + chartH - (val / dynamicMaxVal) * chartH;
+   
+  const actualPoints = safeActual.map((v, i) => `${getActualX(i)},${getY(v)}`).join(' ');
+  const lastActualX = getActualX(actualLen - 1);
+  const lastActualY = getY(safeActual[actualLen - 1]);
+  
+  let predictedPoints = "";
+  if (predLen > 0) {
+    const predCoords = displayPredicted.map((v, i) => `${getPredX(i + 1)},${getY(v)}`).join(' ');
+    predictedPoints = `${lastActualX},${lastActualY} ${predCoords}`;
+  }
+   
+  const yLabels = [0, 1, 2, 3, 4].map(i => `${(dynamicMaxVal * (i / 4)).toFixed(1)}kW`);
+   
+  const xLabels = [];
+  const now = new Date();
+  now.setMinutes(Math.floor(now.getMinutes() / 15) * 15, 0, 0); 
+  
+  const getKSTLabel = (dateObj) => {
+    const utc = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
+    const kstDate = new Date(utc + (9 * 3600000));
+    let hours = kstDate.getHours();
+    const ampm = hours < 12 ? '오전' : '오후';
+    hours = hours % 12;
+    hours = hours === 0 ? 12 : hours; 
+    return `${ampm} ${hours}시`;
+  };
+   
+  const numLabels = 3;
+  if (actualLen > 1) {
+    const interval = Math.floor((actualLen - 1) / (numLabels - 1));
+    for (let i = 0; i < numLabels - 1; i++) {
+        const idx = i * interval;
+        const minutesAgo = (actualLen - 1 - idx) * 15;
+        const timePoint = new Date(now.getTime() - minutesAgo * 60000);
+        xLabels.push({ index: idx, label: getKSTLabel(timePoint), isNow: false });
+    }
+  }
+  xLabels.push({ index: actualLen - 1, label: '현재', isNow: true });
+   
   return (
     <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+      <Line x1={lastActualX} y1={padTop} x2={lastActualX} y2={padTop + chartH} stroke="#EF4444" strokeWidth={1} strokeDasharray="4,4" opacity={0.6} />
       {yLabels.map((label, i) => {
         const y = padTop + chartH - (i / 4) * chartH;
         return (
           <G key={`y-${i}`}>
-            <Line x1={padLeft} y1={y} x2={padLeft + chartW} y2={y}
-              stroke="#E5E7EB" strokeWidth={0.5} strokeDasharray="4,4" />
-            <SvgText x={padLeft - 5} y={y + 4} fontSize={10} fill="#9CA3AF" textAnchor="end">
-              {label}
-            </SvgText>
+            <Line x1={padLeft} y1={y} x2={padLeft + chartW} y2={y} stroke="#E5E7EB" strokeWidth={0.5} />
+            <SvgText x={padLeft - 5} y={y + 4} fontSize={10} fill="#9CA3AF" textAnchor="end">{label}</SvgText>
           </G>
         );
       })}
-      {timeLabels.map((label, i) => {
-        const x = padLeft + (i / (timeLabels.length - 1)) * chartW;
-        return (
-          <SvgText key={`x-${i}`} x={x} y={CHART_HEIGHT - 5}
-            fontSize={10} fill="#9CA3AF" textAnchor="middle">{label}</SvgText>
-        );
-      })}
-      <Polyline points={predictedPoints} fill="none" stroke="#D1D5DB"
-        strokeWidth={2} strokeDasharray="6,4" />
-      <Polyline points={actualPoints} fill="none" stroke="#22C55E" strokeWidth={2.5} />
-      {hourlyActual.map((v, i) => (
-        <Circle key={`dot-${i}`} cx={getX(i)} cy={getY(v)} r={3} fill="#22C55E" />
+      {xLabels.map((item, i) => (
+        <G key={`x-${item.index}-${i}`}>
+          <SvgText 
+            x={getActualX(item.index)} 
+            y={padTop + chartH + 20} 
+            fontSize={10} 
+            fill={item.isNow ? "#EF4444" : "#9CA3AF"} 
+            fontWeight={item.isNow ? "700" : "400"} 
+            textAnchor="middle"
+          >
+            {item.label}
+          </SvgText>
+          <Line x1={getActualX(item.index)} y1={padTop + chartH} x2={getActualX(item.index)} y2={padTop + chartH + 4} stroke="#9CA3AF" strokeWidth={1} />
+        </G>
       ))}
+      {predLen > 0 && <Polyline points={predictedPoints} fill="none" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="6,4" />}
+      {actualLen > 1 && <Polyline points={actualPoints} fill="none" stroke="#22C55E" strokeWidth={2.5} />}
+      <Circle cx={lastActualX} cy={lastActualY} r={5} fill="#EF4444" />
     </Svg>
   );
 };
@@ -82,12 +142,13 @@ const DonutChart = ({value, maxValue, size = 120}) => {
   const circumference = 2 * Math.PI * radius;
   const progress = (value / maxValue) * circumference;
   const center = size / 2;
+  const safeValue = isNaN(Number(value)) ? 0 : Number(value);
+  const displayValue = safeValue.toFixed(1);
 
   return (
     <View style={{width: size, height: size, alignItems: 'center', justifyContent: 'center'}}>
       <Svg width={size} height={size}>
-        <Circle cx={center} cy={center} r={radius} stroke="#E5E7EB"
-          strokeWidth={strokeWidth} fill="none" />
+        <Circle cx={center} cy={center} r={radius} stroke="#E5E7EB" strokeWidth={strokeWidth} fill="none" />
         <Circle cx={center} cy={center} r={radius} stroke="#22C55E"
           strokeWidth={strokeWidth} fill="none"
           strokeDasharray={`${progress},${circumference}`}
@@ -95,7 +156,7 @@ const DonutChart = ({value, maxValue, size = 120}) => {
           transform={`rotate(-90 ${center} ${center})`} />
       </Svg>
       <View style={styles.donutCenter}>
-        <Text style={styles.donutValue}>{value}</Text>
+        <Text style={styles.donutValue}>{displayValue}</Text>
         <Text style={styles.donutUnit}>kWh</Text>
       </View>
     </View>
@@ -103,20 +164,42 @@ const DonutChart = ({value, maxValue, size = 120}) => {
 };
 
 const HomeScreen = () => {
-  useEnergyWebSocket();
   const navigation = useNavigation();
+  
+  // 1. 로그인된 유저 정보를 먼저 가져옴.
+  const {user} = useAuthStore();
+  
+  // 2. 유저의 고유 ID를 웹소켓 훅에 동적 전달. 
+  // (옵셔널 체이닝 `?.`을 사용하여 로그아웃 상태일 때의 크래시를 방어)
+  useEnergyWebSocket(user?.id);
+
   const {
     currentPower, todayAccumulated, monthlyTarget, monthlyUsed,
     savingPercent, monthlySaving, co2Reduction, simulateRealtime, isLoading,
+    hourlyActual
   } = useEnergyStore();
   const {totalPoints, fetchPoints} = usePointStore();
-  const {user} = useAuthStore();
 
   const userName = user?.name || '김에너지';
   const userLocation = user?.location || '강원도 춘천시';
   const monthlyPercent = monthlyTarget > 0 ? Math.round((monthlyUsed / monthlyTarget) * 100) : 0;
 
-  // API에서 데이터 로드
+  // 현실 시간이 아닌 시뮬레이션 시간 동기화
+  // 15분 단위 배열의 길이를 통해 현재 시뮬레이션이 몇 시를 지나고 있는지 역추적.
+  const actualLen = hourlyActual ? hourlyActual.length : 0;
+  let drStatus = '예정';
+  let bannerBgColor = '#3B82F6'; // 파란색 (예정)
+
+  if (actualLen >= 57 && actualLen <= 69) {
+    // 56(14시) ~ 68(17시) 구간
+    drStatus = '진행중';
+    bannerBgColor = '#22C55E'; // 초록색 (진행중)
+  } else if (actualLen > 69) {
+    // 17시 이후
+    drStatus = '종료';
+    bannerBgColor = '#9CA3AF'; // 회색 (종료)
+  }
+
   useEffect(() => {
     const interval = simulateRealtime();
     fetchPoints();
@@ -145,18 +228,26 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* DR 이벤트 배너 */}
+        {/* 다이내믹 DR 이벤트 배너 */}
         <TouchableOpacity
-          style={styles.drBanner}
+          style={[styles.drBanner, { backgroundColor: bannerBgColor }]} // 동적 색상 적용
           activeOpacity={0.85}
           onPress={() => navigation.navigate('DR 이벤트')}>
           <View style={styles.drBannerContent}>
             <View style={styles.drLiveIndicator}>
-              <View style={styles.liveRedDot} />
-              <Text style={styles.drLiveText}>DR 이벤트 진행 중</Text>
+              {drStatus === '진행중' ? (
+                <View style={styles.liveRedDot} />
+              ) : (
+                <Text style={{fontSize: 12, marginRight: 4}}>⏳</Text>
+              )}
+              <Text style={styles.drLiveText}>
+                {drStatus === '진행중' ? 'DR 이벤트 진행 중' : drStatus === '예정' ? 'DR 이벤트 예정' : '금일 DR 이벤트 종료'}
+              </Text>
             </View>
             <Text style={styles.drTimeText}>14:00 ~ 17:00 전력 피크 절감</Text>
-            <Text style={styles.drParticipateText}>참여하고 500P 받기 →</Text>
+            <Text style={styles.drParticipateText}>
+              {drStatus === '진행중' ? '참여하고 500P 받기 →' : drStatus === '예정' ? '미리 알림 설정하기 →' : '내일 다시 참여해주세요 →'}
+            </Text>
           </View>
           <View style={styles.drBannerIcon}>
             <Text style={{fontSize: 28, color: '#FFFFFF'}}>♻️</Text>
@@ -220,13 +311,13 @@ const HomeScreen = () => {
           <TouchableOpacity style={styles.summaryCard} activeOpacity={0.7}
             onPress={() => navigation.navigate('DR 이벤트')}>
             <Text style={{fontSize: 22}}>⚡</Text>
-            <Text style={styles.summaryValue}>{monthlySaving} kWh</Text>
+            <Text style={styles.summaryValue}>{Number(monthlySaving).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} kWh</Text>
             <Text style={styles.summaryLabel}>이번 달 절감</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.summaryCard} activeOpacity={0.7}
             onPress={() => navigation.navigate('마이페이지')}>
             <Text style={{fontSize: 22}}>🌍</Text>
-            <Text style={styles.summaryValue}>{co2Reduction} kg</Text>
+            <Text style={styles.summaryValue}>{Number(co2Reduction).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} kg</Text>
             <Text style={styles.summaryLabel}>CO₂ 감축</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.summaryCard} activeOpacity={0.7}

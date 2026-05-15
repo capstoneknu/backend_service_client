@@ -22,6 +22,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
+    // [추가] 비동기 논블로킹 통신(WebClient) 및 Netty 엔진 주입
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
     // JWT
     implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'

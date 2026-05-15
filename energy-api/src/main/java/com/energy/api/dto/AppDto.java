@@ -15,7 +15,10 @@ public class AppDto {
         private Double monthlyTarget;
         private Double monthlyUsed;
         private Double savingPercent;
-        private Integer monthlySaving;
+
+        // 수정 전: private Integer monthlySaving;
+        private Double monthlySaving; // 수정 후: 전력 도메인 정밀도 확보 및 빌드 에러 방어
+
         private Double co2Reduction;
         private Integer totalPoints;
         private List<Double> hourlyActual;

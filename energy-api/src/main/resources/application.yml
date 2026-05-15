@@ -4,7 +4,8 @@ spring:
 
   # ======== MySQL 설정 ========
   datasource:
-    url: jdbc:mysql://localhost:3306/energydb?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    # [수정 1] allowPublicKeyRetrieval=true 추가로 MySQL 8.0+ 보안 핸드쉐이크 에러 차단
+    url: jdbc:mysql://localhost:3306/energydb?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: energy
     password: energy1234
@@ -16,7 +17,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
+        #[수정 2] dialect 수동 지정 속성 삭제 (Spring Boot 3.x 자동 감지 위임 및 경고 로그 제거)
 
   # H2 콘솔 비활성화
   h2:
@@ -40,6 +41,6 @@ jwt:
   secret: energy-dashboard-capstone-jwt-secret-key-2024-must-be-at-least-256-bits-long
   expiration: 86400000
 
-# 서버 포트
+# 서버 포트 (React Native 앱의 apiClient.js 통신 규약에 맞추어 8080으로 설정)
 server:
-  port: 8081
+  port: 8080

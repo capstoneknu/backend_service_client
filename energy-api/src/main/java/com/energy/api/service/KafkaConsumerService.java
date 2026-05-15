@@ -11,10 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 @Slf4j
 @Service
@@ -26,55 +27,45 @@ public class KafkaConsumerService {
     private final EnergyWebSocketHandler webSocketHandler;
     private final ObjectMapper objectMapper;
 
-    // 여러 타임스탬프 포맷 대응
     private static final DateTimeFormatter[] FORMATTERS = {
-            DateTimeFormatter.ISO_LOCAL_DATE_TIME,                    // 2024-08-01T00:00:00
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),      // 2024-08-01 00:00:00
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),         // 2024-08-01 00:00
+            DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
     };
 
-    /**
-     * A파트의 Kafka 토픽(power-usage-topic)에서 데이터를 소비
-     *
-     * A파트 데이터 포맷:
-     * {
-     *   "device_id": "USER_0001",
-     *   "timestamp": "2024-08-01 00:00:00",
-     *   "kwh_usage": 0.42
-     * }
-     */
     @KafkaListener(topics = "power-usage-topic", groupId = "spring-backend-group")
     public void consume(String message) {
         try {
             JsonNode json = objectMapper.readTree(message);
 
-            // A파트 데이터 필드명에 맞춤
-            String deviceId = json.get("device_id").asText();
+            String rawDeviceId = json.get("device_id").asText();
             String timestampStr = json.get("timestamp").asText();
             double kwhUsage = json.get("kwh_usage").asDouble();
 
-            // 타임스탬프 파싱 (여러 포맷 대응)
             LocalDateTime recordedAt = parseTimestamp(timestampStr);
-            if (recordedAt == null) {
-                log.warn("타임스탬프 파싱 실패: {}", timestampStr);
+            if (recordedAt == null) return;
+
+            Long targetUserId;
+            try {
+                targetUserId = Long.parseLong(rawDeviceId.replaceAll("[^0-9]", ""));
+            } catch (Exception e) {
+                return; 
+            }
+
+            // 파이썬이 쏘는 1만 가구 중, 오직 1번 센서의 데이터 하나만 수용하고 나머지는 버림.
+            if (targetUserId != 1L) {
                 return;
             }
 
-            // device_id에서 사용자 매핑
-            // A파트: "USER_0001" → B파트 DB의 userId로 변환
-            // 현재는 첫 번째 사용자(테스트 계정)로 매핑
-            // TODO: device_id ↔ userId 매핑 테이블 구현
-            User user = userRepository.findById(1L).orElse(null);
-            if (user == null) {
-                log.warn("매핑할 사용자 없음: deviceId={}", deviceId);
-                return;
-            }
+            // 로그인한 유저의 DB 고유 ID가 1이 아닐지라도, 무조건 DB의 첫 번째 유저를 잡아 데이터를 안전하게 전송.
+            User user = userRepository.findById(targetUserId).orElseGet(() -> 
+                userRepository.findAll().stream().findFirst().orElse(null)
+            );
+            
+            if (user == null) return;
 
-            // kWh → kW 변환 (1분 간격 데이터인 경우: kWh * 60 = kW)
-            // A파트 데이터가 1분 단위 kWh이므로 순간 전력(kW)으로 환산
             double powerKw = kwhUsage * 60;
 
-            // DB 저장
             EnergyData data = EnergyData.builder()
                     .user(user)
                     .recordedAt(recordedAt)
@@ -86,19 +77,21 @@ public class KafkaConsumerService {
 
             energyDataRepository.save(data);
 
-            // WebSocket으로 앱에 실시간 전송
+            Double todayAccumulated = energyDataRepository.getTodayAccumulated(user.getId(), recordedAt.toLocalDate());
+            double safeAccumulated = todayAccumulated != null ? todayAccumulated : 0.0;
+
+            String actualUserIdStr = String.valueOf(user.getId());
             String wsPayload = objectMapper.writeValueAsString(
                     java.util.Map.of(
                             "type", "ENERGY_UPDATE",
-                            "deviceId", deviceId,
+                            "deviceId", actualUserIdStr,
                             "currentPower", powerKw,
-                            "kwhUsage", kwhUsage,
+                            "kwhUsage", safeAccumulated,
                             "timestamp", timestampStr
                     )
             );
-            webSocketHandler.broadcast(wsPayload);
 
-            log.debug("전력 데이터 처리: device={}, power={:.2f}kW", deviceId, powerKw);
+            webSocketHandler.sendToDevice(actualUserIdStr, wsPayload);
 
         } catch (Exception e) {
             log.error("Kafka 메시지 처리 에러: {}", e.getMessage());
@@ -106,12 +99,17 @@ public class KafkaConsumerService {
     }
 
     private LocalDateTime parseTimestamp(String ts) {
-        for (DateTimeFormatter fmt : FORMATTERS) {
-            try {
-                return LocalDateTime.parse(ts, fmt);
-            } catch (DateTimeParseException ignored) {
+        try {
+            return OffsetDateTime.parse(ts, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+                    .atZoneSameInstant(ZoneId.of("Asia/Seoul"))
+                    .toLocalDateTime();
+        } catch (DateTimeParseException e1) {
+            for (DateTimeFormatter fmt : FORMATTERS) {
+                try {
+                    return LocalDateTime.parse(ts, fmt);
+                } catch (DateTimeParseException ignored) {}
             }
         }
-        return null;
+        return null; 
     }
 }

@@ -29,7 +29,10 @@ public class EnergyData {
 
     private Double accumulatedKwh;       // 누적 사용량 (kWh)
 
-    private Double predictedKw;          // AI 예측 전력 (kW)
+    // [수정] 이전 AiPredictionService 및 Repository 쿼리와의 정합성 확보
+    // DB의 'predicted_kw' 컬럼과 JPA의 'predictedKw' 필드를 명시적으로 매핑 [cite: 130, 391]
+    @Column(name = "predicted_kw")
+    private Double predictedKw;
 
     @Column(nullable = false)
     private LocalDate recordDate;        // 날짜 (인덱싱용)

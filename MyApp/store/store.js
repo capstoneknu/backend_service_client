@@ -19,12 +19,18 @@ export const useEnergyStore = create((set, get) => ({
 
   // API에서 대시보드 데이터 가져오기
   fetchDashboard: async () => {
-    set({isLoading: true});
+    // UI 깜빡임 방지: 최초 로딩(데이터가 아예 없을 때)에만 스피너를 띄움
+    if (get().hourlyActual.length === 0 && get().currentPower === 0) {
+      set({isLoading: true});
+    }
+    
     try {
       const response = await energyAPI.getDashboard();
       if (response.success) {
         const d = response.data;
         set({
+          // currentPower와 todayAccumulated는 WS가 더 빠르지만, 
+          // 초기 로드 정합성을 위해 덮어쓰기 허용 (화면 튕김 없음)
           currentPower: d.currentPower,
           todayAccumulated: d.todayAccumulated,
           monthlyTarget: d.monthlyTarget,
@@ -44,16 +50,17 @@ export const useEnergyStore = create((set, get) => ({
     }
   },
 
-  // 실시간 시뮬레이션 (주기적으로 API 호출)
   simulateRealtime: () => {
-    // 최초 로드
+    // 최초 화면 진입 시 1회 로드
     get().fetchDashboard();
 
-    // 10초마다 갱신 (실제로는 WebSocket/MQTT로 교체)
+    // 2초마다 백그라운드에서 무거운 통계 및 그래프 데이터를 갱신
+    // 파이썬 시뮬레이터의 초고속(5000 TPS) 시간선을 부드러운 타임랩스처럼 캡처하여 보여줌
     const interval = setInterval(() => {
       get().fetchDashboard();
-    }, 10000);
-    return interval;
+    }, 2000);
+    
+    return interval; 
   },
 }));
 
@@ -65,7 +72,6 @@ export const useDRStore = create((set, get) => ({
   history: [],
   isLoading: false,
 
-  // 이벤트 목록 가져오기
   fetchEvents: async () => {
     set({isLoading: true});
     try {
@@ -79,7 +85,6 @@ export const useDRStore = create((set, get) => ({
     }
   },
 
-  // 참여 이력 가져오기
   fetchHistory: async () => {
     try {
       const response = await drAPI.getHistory();
@@ -91,12 +96,10 @@ export const useDRStore = create((set, get) => ({
     }
   },
 
-  // 이벤트 참여
   participateEvent: async (eventId) => {
     try {
       const response = await drAPI.participate(eventId);
       if (response.success) {
-        // 이벤트 목록 새로고침
         await get().fetchEvents();
         return {success: true};
       }
@@ -106,18 +109,15 @@ export const useDRStore = create((set, get) => ({
     }
   },
 
-  // 알림 토글
   toggleNotification: async (eventId) => {
     try {
       await drAPI.toggleNotification(eventId);
-      // 이벤트 목록 새로고침
       await get().fetchEvents();
     } catch (err) {
       console.log('Notification toggle error:', err.message);
     }
   },
 
-  // 절감량 시뮬레이션 (주기적 API 호출)
   simulateSaving: () => {
     const interval = setInterval(() => {
       get().fetchEvents();
@@ -139,7 +139,6 @@ export const useMissionStore = create((set, get) => ({
     get().fetchMissions(category);
   },
 
-  // 미션 목록 가져오기
   fetchMissions: async (category) => {
     const cat = category || get().selectedCategory;
     set({isLoading: true});
@@ -154,12 +153,10 @@ export const useMissionStore = create((set, get) => ({
     }
   },
 
-  // 미션 진행도 증가
   incrementProgress: async (missionId) => {
     try {
       const response = await missionAPI.incrementProgress(missionId);
       if (response.success) {
-        // 미션 목록 새로고침
         await get().fetchMissions();
         return {success: true, data: response.data, message: response.message};
       }
@@ -170,11 +167,8 @@ export const useMissionStore = create((set, get) => ({
   },
 
   getFilteredMissions: () => get().missions,
-
   getCompletedCount: () => get().missions.filter(m => m.completed).length,
-
-  getEarnedPoints: () =>
-    get().missions.filter(m => m.completed).reduce((sum, m) => sum + m.points, 0),
+  getEarnedPoints: () => get().missions.filter(m => m.completed).reduce((sum, m) => sum + m.points, 0),
 }));
 
 // ==============================
@@ -187,7 +181,6 @@ export const usePointStore = create((set, get) => ({
   history: [],
   isLoading: false,
 
-  // 포인트 요약 가져오기
   fetchPoints: async () => {
     set({isLoading: true});
     try {
@@ -208,7 +201,6 @@ export const usePointStore = create((set, get) => ({
     }
   },
 
-  // 포인트 사용
   spendPoints: async ({title, points}) => {
     try {
       const response = await pointAPI.spend(title, points);

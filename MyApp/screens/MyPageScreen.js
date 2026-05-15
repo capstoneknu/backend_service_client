@@ -48,7 +48,11 @@ const MyPageScreen = () => {
   const displayLocation = user?.location || location;
   const displayHousehold = user?.household || household;
 
-  const goalPercent = Math.round((monthlyReport.used / monthlyReport.target) * 100);
+// 1. 버그 수정: 월 목표가 0일 경우 NaN 또는 Infinity가 되어 앱이 크래시되는 현상 방어
+// 수정 전: const goalPercent = Math.round((monthlyReport.used / monthlyReport.target) * 100);
+  const goalPercent = monthlyReport.target > 0 
+    ? Math.round((monthlyReport.used / monthlyReport.target) * 100) 
+    : 0;
 
   const handleLogout = () => {
     setLogoutModal(false);
@@ -80,19 +84,25 @@ const MyPageScreen = () => {
             <Text style={styles.cardTitle}>에너지 절약 통계</Text>
           </View>
           <View style={styles.statsRow}>
+            {/*  수정 전 */}
+            {/* <Text style={styles.statValue}>{stats.totalSaving} kWh</Text> */}
+            {/* <Text style={styles.statValue}>{stats.co2Reduction} kg</Text> */}
+            {/* <Text style={styles.statValue}>약 {stats.treesPlanted}그루</Text> */}
+
+            {/* 수정 후 (천 단위 콤마 및 소수점 1자리 고정 포맷팅) */}
             <View style={styles.statItem}>
               <Text style={{fontSize: 22}}>⚡</Text>
-              <Text style={styles.statValue}>{stats.totalSaving} kWh</Text>
+              <Text style={styles.statValue}>{Number(stats.totalSaving).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} kWh</Text>
               <Text style={styles.statLabel}>총 절감량</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={{fontSize: 22}}>🌍</Text>
-              <Text style={styles.statValue}>{stats.co2Reduction} kg</Text>
+              <Text style={styles.statValue}>{Number(stats.co2Reduction).toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})} kg</Text>
               <Text style={styles.statLabel}>CO₂ 감축</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={{fontSize: 22}}>🌲</Text>
-              <Text style={styles.statValue}>약 {stats.treesPlanted}그루</Text>
+              <Text style={styles.statValue}>약 {Number(stats.treesPlanted).toLocaleString()}그루</Text>
               <Text style={styles.statLabel}>심은 나무</Text>
             </View>
           </View>

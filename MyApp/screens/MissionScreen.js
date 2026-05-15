@@ -2,8 +2,8 @@ import React, {useState, useEffect} from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
-import {useMissionStore} from '../store/store';
 import {ConfirmModal, ToastModal} from '../components/Modals';
+import {useMissionStore, usePointStore} from '../store/store';
 
 const categories = ['전체', 'DR', '냉난방', '가전', '종합'];
 
@@ -52,6 +52,9 @@ const MissionScreen = () => {
     incrementProgress, getCompletedCount, getEarnedPoints, isLoading,
   } = useMissionStore();
 
+  //[추가] 컴포넌트 내부에서 fetchPoints 객체 추출
+  const {fetchPoints} = usePointStore();
+
   const [confirmModal, setConfirmModal] = useState({visible: false, mission: null});
   const [toast, setToast] = useState({visible: false, message: '', type: 'success'});
 
@@ -76,6 +79,10 @@ const MissionScreen = () => {
 
     const result = await incrementProgress(mission.id);
     if (result.success) {
+      // [수정] 미션이 최종 완료(completed) 상태라면 포인트 스토어를 강제 동기화
+      if (result.data?.completed) {
+          fetchPoints(); 
+      }
       const msg = result.data?.completed
         ? `🎉 "${mission.title}" 미션 완료! +${mission.points}P 적립!`
         : `✓ 진행도가 업데이트되었습니다`;
