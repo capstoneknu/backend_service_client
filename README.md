@@ -46,8 +46,8 @@
 
 초기 기획에서 한 단계 전진하여, 사용자 경험과 데이터 정합성을 확보하기 위해 다음과 같이 아키텍처를 고도화하였습니다.
 
-### Lovable Web Prototype → React Native CLI 전면 이행
-- **변경 사항**: Lovable 기반 React 웹 프로토타입을 React Native 0.84 CLI 환경으로 전체 이관하고, 모든 차트를 `react-native-svg` 네이티브 컴포넌트로 재구현하였다.
+### Web Prototype → React Native CLI 전면 이행
+- **변경 사항**: React 웹 프로토타입을 React Native 0.84 CLI 환경으로 전체 이관하고, 모든 차트를 `react-native-svg` 네이티브 컴포넌트로 재구현하였다.
 - **문제**: Lovable의 웹 컴포넌트는 모바일 네이티브 환경에서 터치 제스처/스크롤 관성/SafeArea 처리가 불연속적이었고, DOM 기반 차트는 안드로이드 저사양 기기에서 프레임 드랍을 유발하였다.
 - **해결**: `@react-navigation/bottom-tabs`와 `@react-navigation/native-stack`을 조합한 이중 네비게이션 구조로 재설계하고, SVG 렌더링은 RN 네이티브 브릿지로 직접 처리하도록 전환하였다.
 - **타당성**: iOS/Android 양 플랫폼에서 단일 코드베이스로 안정적인 렌더링을 확보하고, 발표 시연 시 디바이스/에뮬레이터 환경 차이로 인한 시각적 결함을 제거하였다.
