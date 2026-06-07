@@ -17,7 +17,9 @@ public interface PointHistoryRepository extends JpaRepository<PointHistory, Long
     /**
      * 사용자의 적립-사용 차감한 현재 보유 포인트
      */
-    @Query("SELECT COALESCE(SUM(CASE WHEN ph.type = '사용' THEN -ph.points ELSE ph.points END), 0) " +
+
+    // [버그 수정] 하드코딩된 '사용' 이라는 한글 조건을 정확한 Enum 규격인 'SPEND'로 변경
+    @Query("SELECT COALESCE(SUM(CASE WHEN ph.type ='SPEND' THEN -ph.points ELSE ph.points END), 0) " +
            "FROM PointHistory ph WHERE ph.user = :user")
     Long sumNetPointsByUser(@Param("user") User user);
 }

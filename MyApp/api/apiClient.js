@@ -108,6 +108,12 @@ export const missionAPI = {
     request(`/api/missions/${missionId}/progress`, {
       method: 'POST',
     }),
+
+  // [추가] AI 동적 미션 생성 (E2E 연동)
+  generateAIMission: () =>
+    request('/api/missions/generate', {
+      method: 'POST',
+    }),
 };
 
 // ==============================

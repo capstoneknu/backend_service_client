@@ -166,6 +166,11 @@ export const useMissionStore = create((set, get) => ({
       const response = await missionAPI.incrementProgress(missionId);
       if (response.success) {
         await get().fetchMissions(get().selectedCategory, true);
+
+        // [추가] 미션 성공으로 포인트가 올랐으므로, 포인트와 프로필 스토어 동기화
+        usePointStore.getState().fetchPoints(true);
+        useProfileStore.getState().fetchProfile(true);
+
         return {success: true, data: response.data, message: response.message};
       }
       return {success: false, error: response.message};
