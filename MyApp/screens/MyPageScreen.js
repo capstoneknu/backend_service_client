@@ -9,7 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import {useFocusEffect} from '@react-navigation/native';
+import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import {useProfileStore} from '../store/store';
 import {useAuthStore} from '../store/authStore';
 
@@ -21,6 +21,7 @@ const MyPageScreen = () => {
     fetchProfile, toggleSetting, isLoading,
   } = useProfileStore();
   const {logout} = useAuthStore();
+  const navigation = useNavigation();
 
   // ⭐ 화면 진입할 때마다 항상 최신 데이터 가져오기 (force=true)
   useFocusEffect(
@@ -112,7 +113,12 @@ const MyPageScreen = () => {
         )}
 
         {/* 이번 달 리포트 */}
-        <Text style={styles.sectionTitle}>이번 달 리포트</Text>
+        <View style={styles.reportHeaderRow}>
+          <Text style={styles.sectionTitle}>이번 달 리포트</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('UsageAnalysis')} activeOpacity={0.7}>
+            <Text style={styles.detailLink}>상세 추이 보기 ›</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.reportCard}>
           <View style={styles.reportRow}>
             <Text style={styles.reportLabel}>월 목표</Text>
@@ -206,6 +212,8 @@ const styles = StyleSheet.create({
   progressFill: {height: '100%', backgroundColor: '#22C55E', borderRadius: 4},
 
   sectionTitle: {fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12, marginTop: 4},
+  reportHeaderRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
+  detailLink: {fontSize: 13, fontWeight: '600', color: '#16A34A'},
 
   statsRow: {flexDirection: 'row', gap: 10, marginBottom: 20},
   statCard: {

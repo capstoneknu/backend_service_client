@@ -1,5 +1,6 @@
 package com.energy.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -9,6 +10,7 @@ public class AppDto {
     // ======== 에너지 대시보드 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true) // [추가] API 스키마 진화에 따른 파싱 에러 방어
     public static class DashboardResponse {
         private Double currentPower;
         private Double todayAccumulated;
@@ -25,6 +27,7 @@ public class AppDto {
     // ======== DR 이벤트 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DREventResponse {
         private Long id;
         private String title;
@@ -42,6 +45,7 @@ public class AppDto {
     // ======== DR 참여 이력 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class DRHistoryResponse {
         private Long id;
         private String date;
@@ -54,6 +58,7 @@ public class AppDto {
     // ======== 미션 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MissionResponse {
         private Long id;
         private String icon;
@@ -65,11 +70,14 @@ public class AppDto {
         private Integer total;
         private String unit;
         private Boolean completed;
+        // [추가] ANFIS XAI(설명 가능한 AI) 추론 근거 표출 필드
+        private String explainabilityLog; 
     }
 
     // ======== 미션 진행도 업데이트 요청 ========
     @Getter @Setter
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MissionUpdateRequest {
         private Long missionId;
     }
@@ -77,6 +85,7 @@ public class AppDto {
     // ======== 포인트 내역 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PointHistoryResponse {
         private Long id;
         private String type;
@@ -88,6 +97,7 @@ public class AppDto {
     // ======== 포인트 사용 요청 ========
     @Getter @Setter
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PointSpendRequest {
         private String title;
         private Integer points;
@@ -96,6 +106,7 @@ public class AppDto {
     // ======== 포인트 요약 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class PointSummaryResponse {
         private Integer totalPoints;
         private Integer usedPoints;
@@ -106,6 +117,7 @@ public class AppDto {
     // ======== 마이페이지 프로필 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ProfileResponse {
         private String name;
         private String location;
@@ -113,21 +125,44 @@ public class AppDto {
         private Integer ecoLevel;
         private Integer ecoLevelProgress;
         private Integer pointsToNextLevel;
-        // 통계
+        private Stats stats;
+        private MonthlyReport monthlyReport;
+    }
+
+    // Stats 내부 클래스
+    @Getter @Setter @Builder
+    @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Stats {
         private Double totalSaving;
         private Double co2Reduction;
         private Integer treesPlanted;
-        // 월간 리포트
-        private Double monthlyTarget;
-        private Double monthlyUsed;
-        private Integer prevMonthSavingPercent;
+    }
+
+    // MonthlyReport 내부 클래스
+    @Getter @Setter @Builder
+    @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class MonthlyReport {
+        private Double target;
+        private Double used;
+        private Integer prevMonthSaving;
         private Integer drParticipation;
         private Integer drSuccess;
+    }
+
+    // ======== 시계열 분석 응답 (InfluxDB 추이) ========
+    @Getter @Setter @Builder
+    @NoArgsConstructor @AllArgsConstructor
+    public static class TimeseriesPoint {
+        private String time;
+        private Double value;
     }
 
     // ======== 공통 API 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ApiResponse<T> {
         private Boolean success;
         private String message;

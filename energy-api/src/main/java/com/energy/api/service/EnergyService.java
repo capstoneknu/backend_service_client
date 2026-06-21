@@ -25,8 +25,9 @@ public class EnergyService {
 
     private final EnergyDataRepository energyDataRepository;
     private final UserRepository userRepository;
+    private final AiEngineClient aiEngineClient;
 
-    private static final int CHART_POINTS = 8;
+    private static final int CHART_POINTS = 24;
     private static final double MONTHLY_TARGET_KWH = 400.0;
     private static final double CO2_FACTOR = 0.4477;
 
@@ -59,9 +60,17 @@ public class EnergyService {
 
         double savingPercent = calculateSavingPercent(todayKwh, yesterdayKwh);
 
-        // ⭐ 현재 시간 기준 최근 8시간 차트
-        List<Double> hourlyActual = buildHourlyActualDynamic(user, today, yesterday);
-        List<Double> hourlyPredicted = buildHourlyPredicted(hourlyActual);
+        // ⭐ 하루 24시간(00~23시) 전체 차트 (프론트 24슬롯 축과 정합)
+        List<Double> hourlyActual = buildHourlyActualFullDay(user, today);
+
+        // ⭐ AI 예측선: 실제 LSTM(FastAPI) 호출. 통신 장애 시 근사치로 Fallback (결함 허용)
+        List<Double> hourlyPredicted;
+        try {
+            hourlyPredicted = aiEngineClient.fetchLstmPrediction(userId);
+        } catch (Exception e) {
+            log.warn("[LSTM Fallback] 예측 API 실패, 근사치로 대체: {}", e.getMessage());
+            hourlyPredicted = buildHourlyPredicted(hourlyActual);
+        }
 
         double monthlySaving = Math.max(0, MONTHLY_TARGET_KWH - monthlyUsed);
         double co2Reduction = monthlySaving * CO2_FACTOR;
@@ -88,27 +97,14 @@ public class EnergyService {
     }
 
     /**
-     * 현재 시간 기준 최근 8시간의 평균 전력 데이터
-     * (자정을 넘는 경우 어제 데이터도 포함)
+     * 하루 24시간(00~23시)의 시간별 평균 전력 데이터 (프론트 24슬롯 렌더링과 정합)
      */
-    private List<Double> buildHourlyActualDynamic(User user, LocalDate today, LocalDate yesterday) {
-        int currentHour = LocalDateTime.now().getHour();
-
-        // 오늘 시간별 데이터
+    private List<Double> buildHourlyActualFullDay(User user, LocalDate today) {
         Map<Integer, Double> todayHourMap = queryHourlyMap(user, today);
-        // 어제 시간별 데이터 (자정을 넘는 경우)
-        Map<Integer, Double> yesterdayHourMap = queryHourlyMap(user, yesterday);
 
         List<Double> result = new ArrayList<>();
-        // currentHour-7 부터 currentHour 까지 8개 포인트
-        for (int i = 0; i < CHART_POINTS; i++) {
-            int offset = i - (CHART_POINTS - 1);  // -7, -6, ..., -1, 0
-            int hour = (currentHour + offset + 24) % 24;
-            boolean isYesterday = (currentHour + offset) < 0;
-
-            Map<Integer, Double> source = isYesterday ? yesterdayHourMap : todayHourMap;
-            double value = source.getOrDefault(hour, 0.0);
-            result.add(round(value, 2));
+        for (int hour = 0; hour < CHART_POINTS; hour++) {
+            result.add(round(todayHourMap.getOrDefault(hour, 0.0), 2));
         }
         return result;
     }

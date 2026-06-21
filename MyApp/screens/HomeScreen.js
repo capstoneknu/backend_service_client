@@ -1,94 +1,83 @@
-import React, {useEffect, useMemo} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Alert
 } from 'react-native';
-import Svg, {
-  Circle,
-  Line,
-  Polyline,
-  Text as SvgText,
-  G,
-} from 'react-native-svg';
+import Svg, { Circle, Line, Polyline, Text as SvgText, G } from 'react-native-svg';
 import {useNavigation} from '@react-navigation/native';
 import {useEnergyStore, usePointStore} from '../store/store';
 import {useAuthStore} from '../store/authStore';
 import {useEnergyWebSocket} from '../api/useWebSocket';
+import { missionAPI } from '../api/apiClient'; // [추가] API 통신용 클라이언트
 
 const {width: SCREEN_WIDTH} = Dimensions.get('window');
 const CHART_WIDTH = SCREEN_WIDTH - 80;
 const CHART_HEIGHT = 180;
 
 /**
- * 현재 시간 기준 최근 8시간 라벨 생성
- * 예: 현재 14시 → ['07', '08', '09', '10', '11', '12', '13', '14']
- * 예: 현재 01시 → ['18', '19', '20', '21', '22', '23', '00', '01']
+ * [수정됨] 24시간 차트 라벨 생성 (데이터 배열 24개와 동기화)
+ * 3시간 간격으로 라벨을 표시하여 UI 겹침 방지
  */
 const getDynamicTimeLabels = () => {
-  const currentHour = new Date().getHours();
   const labels = [];
-  for (let i = 0; i < 8; i++) {
-    const offset = i - 7; // -7, -6, ..., -1, 0
-    const hour = (currentHour + offset + 24) % 24;
-    labels.push(String(hour).padStart(2, '0'));
+  for (let i = 0; i < 24; i++) {
+    if (i % 3 === 0) { // 3시간 간격으로만 시간 텍스트 표시
+      labels.push(String(i).padStart(2, '0') + '시');
+    } else {
+      labels.push(''); // 빈 칸으로 간격 유지
+    }
   }
   return labels;
 };
 
 const EnergyChart = () => {
   const {hourlyActual, hourlyPredicted} = useEnergyStore();
-
-  // 1분마다 라벨 재계산 (자정을 넘어가는 경우 대응)
   const timeLabels = useMemo(() => getDynamicTimeLabels(), [hourlyActual]);
 
   if (!hourlyActual || hourlyActual.length === 0) return null;
 
-  const maxVal = 8;
+  const maxVal = 10; // 최대 전력량 스케일 조정
   const padLeft = 40;
   const padTop = 10;
   const padBottom = 30;
   const chartW = CHART_WIDTH - padLeft;
   const chartH = CHART_HEIGHT - padTop - padBottom;
 
-  const getX = (i) => padLeft + (i / (hourlyActual.length - 1)) * chartW;
-  const getY = (val) => padTop + chartH - (val / maxVal) * chartH;
+  // X, Y 좌표 계산 함수
+  const getX = (i) => padLeft + (i / (Math.max(hourlyActual.length - 1, 1))) * chartW;
+  const getY = (val) => padTop + chartH - (Math.min(val, maxVal) / maxVal) * chartH;
 
   const actualPoints = hourlyActual.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
   const predictedPoints = hourlyPredicted.map((v, i) => `${getX(i)},${getY(v)}`).join(' ');
 
-  const yLabels = ['0kW', '2kW', '4kW', '6kW', '8kW'];
+  const yLabels = ['0kW', '2.5kW', '5kW', '7.5kW', '10kW'];
 
   return (
     <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+      {/* Y축 가이드라인 */}
       {yLabels.map((label, i) => {
         const y = padTop + chartH - (i / 4) * chartH;
         return (
           <G key={`y-${i}`}>
-            <Line x1={padLeft} y1={y} x2={padLeft + chartW} y2={y}
-              stroke="#E5E7EB" strokeWidth={0.5} strokeDasharray="4,4" />
-            <SvgText x={padLeft - 5} y={y + 4} fontSize={10} fill="#9CA3AF" textAnchor="end">
-              {label}
-            </SvgText>
+            <Line x1={padLeft} y1={y} x2={padLeft + chartW} y2={y} stroke="#E5E7EB" strokeWidth={0.5} strokeDasharray="4,4" />
+            <SvgText x={padLeft - 5} y={y + 4} fontSize={10} fill="#9CA3AF" textAnchor="end">{label}</SvgText>
           </G>
         );
       })}
+      {/* X축 시간 라벨 */}
       {timeLabels.map((label, i) => {
-        const x = padLeft + (i / (timeLabels.length - 1)) * chartW;
+        if (!label) return null;
+        const x = padLeft + (i / 23) * chartW;
         return (
-          <SvgText key={`x-${i}`} x={x} y={CHART_HEIGHT - 5}
-            fontSize={10} fill="#9CA3AF" textAnchor="middle">{label}</SvgText>
+          <SvgText key={`x-${i}`} x={x} y={CHART_HEIGHT - 5} fontSize={10} fill="#9CA3AF" textAnchor="middle">{label}</SvgText>
         );
       })}
-      <Polyline points={predictedPoints} fill="none" stroke="#D1D5DB"
-        strokeWidth={2} strokeDasharray="6,4" />
+      {/* AI 예측선 (회색 점선) */}
+      <Polyline points={predictedPoints} fill="none" stroke="#D1D5DB" strokeWidth={2} strokeDasharray="6,4" />
+      {/* 실제 사용량 선 (녹색 실선) */}
       <Polyline points={actualPoints} fill="none" stroke="#22C55E" strokeWidth={2.5} />
+      {/* 실제 사용량 데이터 점 */}
       {hourlyActual.map((v, i) => (
-        <Circle key={`dot-${i}`} cx={getX(i)} cy={getY(v)} r={3} fill="#22C55E" />
+        <Circle key={`dot-${i}`} cx={getX(i)} cy={getY(v)} r={2.5} fill="#22C55E" />
       ))}
     </Svg>
   );
@@ -129,6 +118,9 @@ const HomeScreen = () => {
   const {totalPoints, fetchPoints} = usePointStore();
   const {user} = useAuthStore();
 
+  // [추가] AI 미션 로딩 상태
+  const [isGeneratingMission, setIsGeneratingMission] = useState(false);
+
   useEnergyWebSocket();
 
   const userName = user?.name || '김에너지';
@@ -139,6 +131,35 @@ const HomeScreen = () => {
     fetchDashboard();
     fetchPoints();
   }, []);
+
+  // [추가] AppDto.ApiResponse 규약에 맞춘 AI 동적 미션 요청 함수
+  const handleGenerateAIMission = async () => {
+    try {
+      setIsGeneratingMission(true);
+
+      // 1. 정확히 모듈화된 함수 호출
+      const response = await missionAPI.generateAIMission();
+      
+      // 2. Axios가 아닌 Fetch 래퍼의 리턴 구조에 맞게 접근 (response.data.success ➔ response.success)
+      if (response.success === true) {
+        // 백엔드에서 강제한 Snake Case 키값을 정확히 매핑하고 1 Depth(response.data)로 접근
+        const targetRatio = response.data.curtailment_ratio_percent;
+        const rewardPoints = response.data.expected_reward_points;
+
+        Alert.alert(
+          "AI 맞춤형 미션 도착!",
+          `AI가 ${userName}님의 패턴을 분석하여 새로운 미션을 발급했습니다.\n\n목표: ${targetRatio}% 절감\n보상: ${rewardPoints}P`,
+          [{ text: "미션 확인하기", onPress: () => navigation.navigate('미션') }]
+        );
+      } else {
+        throw new Error(response.message || "백엔드 응답 실패");
+      }
+    } catch (error) {
+      Alert.alert("미션 발급 실패", `AI 엔진 통신 중 오류가 발생했습니다.\n(${error.message})`);
+    } finally {
+      setIsGeneratingMission(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -161,20 +182,31 @@ const HomeScreen = () => {
           </TouchableOpacity>
         </View>
 
+        {/* [수정됨] AI 미션 생성 배너로 변경 */}
         <TouchableOpacity
           style={styles.drBanner}
           activeOpacity={0.85}
-          onPress={() => navigation.navigate('DR 이벤트')}>
+          onPress={handleGenerateAIMission}
+          disabled={isGeneratingMission}
+        >
           <View style={styles.drBannerContent}>
             <View style={styles.drLiveIndicator}>
               <View style={styles.liveRedDot} />
-              <Text style={styles.drLiveText}>DR 이벤트 진행 중</Text>
+              <Text style={styles.drLiveText}>AI 맞춤형 미션</Text>
             </View>
-            <Text style={styles.drTimeText}>14:00 ~ 17:00 전력 피크 절감</Text>
-            <Text style={styles.drParticipateText}>참여하고 500P 받기 →</Text>
+            <Text style={styles.drTimeText}>지금 내게 맞는 절약 미션은?</Text>
+            {isGeneratingMission ? (
+              <Text style={styles.drParticipateText}>AI가 패턴을 분석 중입니다...</Text>
+            ) : (
+              <Text style={styles.drParticipateText}>클릭하여 AI 미션 발급받기 →</Text>
+            )}
           </View>
           <View style={styles.drBannerIcon}>
-            <Text style={{fontSize: 28, color: '#FFFFFF'}}>♻️</Text>
+            {isGeneratingMission ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={{fontSize: 28, color: '#FFFFFF'}}>🤖</Text>
+            )}
           </View>
         </TouchableOpacity>
 
@@ -211,7 +243,7 @@ const HomeScreen = () => {
 
         <View style={styles.card}>
           <View style={styles.chartHeader}>
-            <Text style={styles.cardTitle}>시간대별 전력 사용량 (최근 8시간)</Text>
+            <Text style={styles.cardTitle}>시간대별 전력 사용량 비교</Text>
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, {backgroundColor: '#22C55E'}]} />

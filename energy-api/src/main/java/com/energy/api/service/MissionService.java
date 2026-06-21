@@ -1,6 +1,7 @@
 package com.energy.api.service;
 
 import com.energy.api.dto.AppDto;
+import com.energy.api.dto.AiMissionResponse;
 import com.energy.api.entity.*;
 import com.energy.api.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -20,36 +21,71 @@ public class MissionService {
     private final UserRepository userRepository;
     private final PointHistoryRepository pointHistoryRepository;
 
-    // ---- 미션 목록 (사용자 진행도 포함) ----
+    // ---- 미션 목록 (사용자 진행도 포함, 개인 미션 격리 방어 로직 추가) ----
     public List<AppDto.MissionResponse> getMissions(Long userId, String category) {
-        List<Mission> missions;
+        List<Mission> allActive;
         if (category == null || category.equals("전체")) {
-            missions = missionRepository.findByActiveTrue();
+            allActive = missionRepository.findByActiveTrue();
         } else {
-            missions = missionRepository.findByCategoryAndActiveTrue(category);
+            allActive = missionRepository.findByCategoryAndActiveTrue(category);
         }
 
-        return missions.stream().map(mission -> {
-            MissionProgress prog = progressRepository
-                    .findByUserIdAndMissionId(userId, mission.getId())
-                    .orElse(null);
+        return allActive.stream()
+                // [방어] 대상 유저가 지정되지 않은 '공용 미션' 이거나, '내 전용 미션'만 통과시킴
+                .filter(m -> m.getTargetUserId() == null || m.getTargetUserId().equals(userId))
+                .map(mission -> {
+                    MissionProgress prog = progressRepository
+                            .findByUserIdAndMissionId(userId, mission.getId())
+                            .orElse(null);
 
-            int progress = prog != null ? prog.getProgress() : 0;
-            boolean completed = prog != null && prog.getCompleted();
+                    int progress = prog != null ? prog.getProgress() : 0;
+                    boolean completed = prog != null && prog.getCompleted();
 
-            return AppDto.MissionResponse.builder()
-                    .id(mission.getId())
-                    .icon(mission.getIcon())
-                    .title(mission.getTitle())
-                    .description(mission.getDescription())
-                    .category(mission.getCategory())
-                    .points(mission.getPoints())
-                    .progress(progress)
-                    .total(mission.getTotalGoal())
-                    .unit(mission.getUnit())
-                    .completed(completed)
-                    .build();
-        }).collect(Collectors.toList());
+                    return AppDto.MissionResponse.builder()
+                            .id(mission.getId())
+                            .icon(mission.getIcon())
+                            .title(mission.getTitle())
+                            .description(mission.getDescription())
+                            .category(mission.getCategory())
+                            .points(mission.getPoints())
+                            .progress(progress)
+                            .total(mission.getTotalGoal())
+                            .unit(mission.getUnit())
+                            .completed(completed)
+                            .explainabilityLog(mission.getExplainabilityLog()) 
+                            .build();
+                }).collect(Collectors.toList());
+    }
+
+    // ---- [추가] AI 미션 생성 및 Progress 1:1 매핑 트랜잭션 ----
+    @Transactional
+    public Mission createPersonalAiMission(User user, AiMissionResponse aiResponse) {
+        Mission newMission = Mission.builder()
+                .title("AI 맞춤형 " + aiResponse.getDifficulty() + " 미션")
+                .description("AI 예측 CBL 대비 " + aiResponse.getCurtailmentRatioPercent() + "% 절감하기")
+                .category("AI")
+                .points(aiResponse.getExpectedRewardPoints())
+                .totalGoal(1)
+                .unit("회")
+                .icon("🤖")
+                .explainabilityLog(aiResponse.getExplainabilityLog())
+                .active(true)
+                .targetUserId(user.getId()) // 개인 전용 꼬리표 부착
+                .build();
+        
+        missionRepository.save(newMission);
+
+        // 생성과 동시에 내 진행도(Progress) 테이블에 0% 상태로 묶음
+        MissionProgress progress = MissionProgress.builder()
+                .user(user)
+                .mission(newMission)
+                .progress(0)
+                .completed(false)
+                .build();
+                
+        progressRepository.save(progress);
+
+        return newMission;
     }
 
     // ---- 미션 진행도 업데이트 ----
@@ -106,6 +142,8 @@ public class MissionService {
                 .total(mission.getTotalGoal())
                 .completed(progress.getCompleted())
                 .points(mission.getPoints())
+                // [추가] 업데이트 응답에도 XAI 로그 포함
+                .explainabilityLog(mission.getExplainabilityLog())
                 .build();
     }
 

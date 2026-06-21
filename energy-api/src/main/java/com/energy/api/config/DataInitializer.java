@@ -121,26 +121,36 @@ public class DataInitializer implements CommandLineRunner {
                 .savedKwh(0.8).success(false).earnedPoints(100).build();
         participationRepository.save(hist3);
 
-        // 4. 미션
+        // 4. 미션 - XAI 로그 (Explainability Log) 주입
         missionRepository.save(Mission.builder()
                 .title("에어컨 1도 올리기").description("냉방 온도를 26°C 이상으로 설정")
-                .category("냉난방").points(50).totalGoal(5).unit("일").icon("🌡️").build());
+                .category("냉난방").points(50).totalGoal(5).unit("일").icon("🌡️")
+                .explainabilityLog("[XAI 추론결과] 전력망 안정(Normal) 상태이나, 사용자의 미션 실패율이 높아 이탈 방지를 위해 동적 난이도 'Easy' 및 맞춤형 보상 배율을 산출함.")
+                .build());
 
         missionRepository.save(Mission.builder()
                 .title("대기전력 차단").description("미사용 전자기기 플러그 뽑기")
-                .category("가전").points(30).totalGoal(7).unit("일").icon("✅").build());
+                .category("가전").points(30).totalGoal(7).unit("일").icon("✅")
+                .explainabilityLog("[XAI 추론결과] 전력망 주의(Warning) 상태이며, 사용자의 과거 미션 달성률이 평균적이므로 동적 난이도 'Medium' 산출.")
+                .build());
 
         missionRepository.save(Mission.builder()
                 .title("피크시간 절전").description("14~17시 전력 사용량 20% 줄이기")
-                .category("DR").points(100).totalGoal(5).unit("회").icon("⏰").build());
+                .category("DR").points(100).totalGoal(5).unit("회").icon("⏰")
+                .explainabilityLog("[XAI 추론결과] 전력망 부하가 극심한 긴급(Emergency) 상태이며, 사용자의 과거 미션 달성률이 매우 우수하여 동적 난이도 'Hard' 및 최고 보상 배율 산출.")
+                .build());
 
         missionRepository.save(Mission.builder()
                 .title("세탁기 모아 돌리기").description("주 2회 이하로 세탁기 사용")
-                .category("가전").points(40).totalGoal(4).unit("주").icon("🧺").build());
+                .category("가전").points(40).totalGoal(4).unit("주").icon("🧺")
+                .explainabilityLog("[XAI 추론결과] 전력망 안정(Normal) 상태이며, 사용자의 패턴 분석 결과 가전 카테고리 기여도가 높아 난이도 'Medium' 산출.")
+                .build());
 
         missionRepository.save(Mission.builder()
                 .title("월간 10% 절감 달성").description("전월 대비 전력 사용량 10% 감소")
-                .category("종합").points(200).totalGoal(1).unit("회").icon("📊").build());
+                .category("종합").points(200).totalGoal(1).unit("회").icon("📊")
+                .explainabilityLog("[XAI 추론결과] 장기적 관점의 종합 절감 목표. 이전 달의 성공 확률(95%)을 반영하여 난이도 'Medium' 산출.")
+                .build());
 
         // 5. 포인트 내역
         pointHistoryRepository.save(PointHistory.builder()

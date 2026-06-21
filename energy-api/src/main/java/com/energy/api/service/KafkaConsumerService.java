@@ -36,14 +36,18 @@ public class KafkaConsumerService {
     public void consume(String message) {
         try {
             JsonNode json = objectMapper.readTree(message);
-            String deviceId = json.get("device_id").asText();
+            String deviceIdStr = json.get("device_id").asText();
             double kwhUsage = json.get("kwh_usage").asDouble();
-
-            // ⭐ 데이터의 timestamp가 과거 날짜(2026-04-14 등)라서
-            //    실제 수신 시점(지금)으로 저장하여 오늘 데이터로 집계
-            LocalDateTime recordedAt = LocalDateTime.now();
-
             double powerKw = kwhUsage * 60;
+
+            // =================================================================
+            // 출처 식별(물리 99999 vs 가상) + 데모 타깃 가구(1번)로 정규화.
+            //   - 물리 ESP32: device_id "99999"
+            //   - 가상 시뮬레이터: 합성데이터 키(숫자 ID 또는 "USER_XXXX")로 인입
+            //   모든 인입을 내부 논리 가구 1L로 매핑하여 단일 대시보드로 집계한다.
+            // =================================================================
+            boolean isPhysical = "99999".equals(deviceIdStr);
+            LocalDateTime recordedAt = LocalDateTime.now();
             long now = System.currentTimeMillis();
 
             // DB 저장 (5초 간격)
@@ -65,22 +69,23 @@ public class KafkaConsumerService {
                 }
             }
 
-            // WebSocket broadcast (1초 간격)
+            // WebSocket broadcast (1초 간격) + 출처 추적 로그(스로틀 내부에서만 출력하여 로그 폭주 방지)
             long lastBroadcast = lastBroadcastTime.get();
             if (now - lastBroadcast >= BROADCAST_INTERVAL_MS) {
                 if (lastBroadcastTime.compareAndSet(lastBroadcast, now)) {
+                    log.info("{} Inbound: src={}, power={}kW",
+                            isPhysical ? "[PHYSICAL SENSOR]" : "[VIRTUAL SENSOR]",
+                            deviceIdStr, String.format("%.2f", powerKw));
                     String wsPayload = objectMapper.writeValueAsString(
                             java.util.Map.of(
                                     "type", "ENERGY_UPDATE",
-                                    "deviceId", deviceId,
+                                    "deviceId", "1",
                                     "currentPower", powerKw,
                                     "kwhUsage", kwhUsage,
                                     "timestamp", recordedAt.toString()
                             )
                     );
                     webSocketHandler.broadcast(wsPayload);
-                    log.info("⚡ Broadcast: device={}, power={}kW",
-                            deviceId, String.format("%.2f", powerKw));
                 }
             }
 
