@@ -1,6 +1,11 @@
-# 우리집 전기 저금통 - Backend Service & Client
+# 보고서에 맞춰서 수정 및 추가 해봤는데 혹시라도 틀린 부분이 있으면 말씀해 주세요!
 
-# 기말이 대부분 과제물이 많아 현재 조금씩 수정 중입니다. 시험이 끝나는 19일 이후 20일 21일 즈음 최종 수정본으로 올리도록 하겠습니다!
+# 차트 규격 96슬롯(15분) → 24슬롯(1시간)으로 정정
+(신규 섹션) 홈 차트 AI 예측선 → 실제 LSTM 연동
+(신규 섹션) InfluxDB 시계열 분석 화면 (Polyglot Persistence 실증)
+(신규 섹션) Saga 결제 무결성 + Fallback
+실행 가이드 경로 data_pipeline_ai-main → ai-data-pipeline 수정
+디렉터리 구조에 신규 파일 5종 반영 (아래)
 
 본 레포지토리는 강원특별자치도 2040 탄소중립 실현을 위한 '에지-AI 융합 분산 아키텍처 기반 도민 참여형 수요반응(DR) 플랫폼'의 **백엔드 서비스(MSA)** 및 **사용자 클라이언트(Mobile App)** 계층입니다. A파트의 AI 코어가 산출한 예측 부하(LSTM)와 미션 난이도(ANFIS)를 도민이 직관적으로 인지할 수 있도록 시각화하고, JWT 인증·DR 이벤트 참여·미션 진행·포인트 정산 등 도메인 비즈니스 로직을 처리하는 End-to-End 서비스 레이어를 구현하였습니다.
 
@@ -13,8 +18,8 @@
 
  ┌──────────────────────┐         ┌────────────────────────────┐         ┌────────────────────────┐
  │  Kafka Topic         │  Pull   │  KafkaConsumerService      │   WS    │  HomeScreen            │
- │  power-usage-topic   │ ──────▶ │   └─▶ MySQL EnergyData     │ ──────▶ │  (도넛/96슬롯 라인차트) │
- │  (96슬롯 페이로드)    │         │      EnergyWebSocketHandler│         │                        │
+ │  power-usage-topic   │ ──────▶ │   └─▶ MySQL EnergyData     │ ──────▶ │  (도넛/24슬롯 라인차트) │
+ │  (24슬롯 페이로드)    │         │      EnergyWebSocketHandler│         │                        │
  └──────────────────────┘         └────────────────────────────┘         └────────────────────────┘
                                               ▲                                     ▲
  ┌──────────────────────┐                     │                                     │
@@ -39,7 +44,7 @@
 ```
 
 - **수신 (Ingestion)**: Spring Boot의 `KafkaConsumerService`가 A파트의 Kafka 토픽(`power-usage-topic`)을 Pull 방식으로 구독한다.
-- **영속 (Persistence)**: 수신된 96슬롯(15분 단위) 데이터는 JPA 트랜잭션을 통해 MySQL의 `EnergyData` 엔티티에 적재된다.
+- **영속 (Persistence)**: 수신된 24슬롯(1시간 단위) 데이터는 JPA 트랜잭션을 통해 MySQL의 `EnergyData` 엔티티에 적재된다.
 - **중계 (Broadcasting)**: 동시에 `EnergyWebSocketHandler`가 인증된 모바일 클라이언트로 실시간 푸시한다.
 - **표출 (Visualization)**: React Native 앱(`HomeScreen`)이 WebSocket으로 수신한 페이로드를 `react-native-svg` 도넛/라인 차트로 즉각 렌더링한다.
 - **상호작용 (Interaction)**: 도민은 미션 수행/DR 참여를 통해 포인트를 적립하고, Mock 결제 API를 통해 강원 지역 가맹점에서 차감 사용한다.
@@ -66,10 +71,10 @@
 - **해결**: Zustand의 selector 패턴을 활용해 도메인별 상태를 격리하고, 컴포넌트가 구독하는 슬라이스만 리렌더링되도록 종속성을 정제하였다.
 - **타당성**: 백엔드 API 도메인(인증·에너지·DR·미션·포인트·프로필)과 클라이언트 스토어 도메인이 1:1로 정합하여, 향후 API 확장 시 영향 범위가 명확히 한정된다.
 
-### 96슬롯 WebSocket 데이터 규격 정합 (A파트 ↔ B파트 동기화)
-- **변경 사항**: A파트가 다운샘플링한 15분 단위(96슬롯) 배열 규격을 그대로 수용하도록 `EnergyWebSocketHandler`와 클라이언트 `useWebSocket` 훅의 페이로드 스키마를 정렬하였다.
+### 24슬롯 WebSocket 데이터 규격 정합 (A파트 ↔ B파트 동기화)
+- **변경 사항**: A파트가 다운샘플링한 1시간 단위(24슬롯) 배열 규격을 그대로 수용하도록 `EnergyWebSocketHandler`와 클라이언트 `useWebSocket` 훅의 페이로드 스키마를 정렬하였다.
 - **문제**: 초기 구현에서 백엔드와 모바일 앱이 서로 다른 시간 단위를 가정하여, 차트의 X축 인덱스와 데이터 길이가 어긋나는 결함이 발생하였다.
-- **해결**: 공통 DTO(`AppDto`)에 `hourlyActual: number[96]` 필드를 정의하여 양 계층 모두 동일 인덱싱으로 처리하도록 강제하였다.
+- **해결**: 공통 DTO(`AppDto`)에 `hourlyActual: number[24]` 필드를 정의하여 양 계층 모두 동일 인덱싱으로 처리하도록 강제하였다.
 - **타당성**: SVG 차트의 `viewBox` 폭과 데이터 포인트 수가 정확히 일치하여 시간축 왜곡 없이 렌더링되며, A파트 Time-Warp 엔진의 "현실 1초 = 시뮬레이션 1분" 가정을 클라이언트까지 일관되게 전달한다.
 
 ### JWT Stateless 인증 + WebSocket 핸드셰이크 분리
@@ -84,12 +89,29 @@
 - **해결**: `--port 8082` 플래그를 `start-all.bat`과 빌드 명령 양쪽에 명시하여 포트 점유를 분리하였다.
 - **타당성**: 한 머신에서 백엔드와 모바일 빌드 환경이 충돌 없이 공존하여, 발표 환경 셋업 시간을 단축한다.
 
+### 홈 차트 AI 예측선 → 실제 LSTM 연동
+- **변경 사항**: 홈 차트의 "AI 예측"(회색 점선)을 A파트 LSTM 추론에 직접 연결하였다.
+- **문제**: 기존 `EnergyService.buildHourlyPredicted()`는 "실제값 × 랜덤(±15%)"로 예측선을 흉내내어, 보고서가 내세운 LSTM 24시간 수요 예측(CBL)이 화면에 실증되지 않았다.
+- **해결**: `AiEngineClient.fetchLstmPrediction()`이 FastAPI(`/api/v1/predict`)의 LSTM 24시간 예측을 호출하고, 분당 kWh → 대시보드 kW(×60) 단위로 환산해 회색 점선에 반영한다. 통신 장애 시 기존 근사치로 Fallback 한다.
+- **타당성**: "실제 vs AI 예측" 차트가 실제 LSTM 출력이 되어, 24슬롯 축 위에서 실측 녹색 실선과 예측 회색 점선을 정합하게 비교할 수 있다.
+
+### InfluxDB 시계열 분석 화면 (Polyglot Persistence 실증)
+- **변경 사항**: 마이페이지 "이번 달 리포트 → 상세 추이 보기"로 진입하는 시계열 분석 화면(`UsageAnalysisScreen`)을 신설하였다.
+- **문제**: 보고서가 강조한 InfluxDB(시계열 전용 저장소)가 적재 용도로만 쓰이고 사용자 화면에 노출되지 않았다.
+- **해결**: FastAPI(`/api/v1/timeseries`, `PowerDBClient.get_aggregated_series`)가 InfluxDB(`power-data`) 원본을 Flux로 일/시간 단위 집계하고, Spring(`AiEngineClient.fetchTimeseries` → `GET /api/energy/timeseries`)이 프록시하여 RN 막대 차트(총사용량/일평균/최대)로 표출한다.
+- **타당성**: RDB(MySQL)와 시계열 DB(InfluxDB)를 목적별로 분리 활용하는 Polyglot Persistence 전략이 사용자 화면 단까지 실증된다.
+
+### 분산 트랜잭션(Saga) 결제 무결성 + 결함 허용(Fallback)
+- **변경 사항**: 외부 결제망 장애를 모사(50% 확률)하고, AI 코어 통신 장애에 대비한 방어 로직을 적용하였다.
+- **해결**: 결제는 `ExternalPaymentException` + `@Transactional(noRollbackFor=...)`로, 장애 시에도 "[결제 실패 환불]" 보상 트랜잭션 원장을 커밋한 뒤 HTTP 400을 반환한다. AI 미션은 `AiEngineClient`가 FastAPI(`/api/missions/generate`) 호출에 실패하면 기본 미션(Easy, 50P)을 Fallback 반환한다.
+- **타당성**: 외부 시스템(결제망/AI 코어) 장애가 전체 트랜잭션을 마비시키지 않고, 자산 데이터 무결성과 서비스 연속성을 보장한다.
+
 ## 시스템 구동 절차 (Execution Guide)
 
 본 시스템은 A파트(데이터 파이프라인/AI)와 B파트(백엔드/클라이언트)가 분리된 멀티 레포 구조입니다. 의존성 충돌 및 포트 점유 문제를 방지하기 위해 아래의 순서를 정확히 지켜 실행합니다. 최상위 `start-all.bat`을 통해 일괄 기동도 가능합니다.
 
 ### Phase 1: A파트 인프라 컨테이너 기동
-- 경로: `C:\dev\data_pipeline_ai-main\` (A파트 레포)
+- 경로: `C:\dev\ai-data-pipeline\` (A파트 레포)
 - 명령어: `docker-compose up -d`
 - 역할: Kafka, Zookeeper, InfluxDB, MySQL 컨테이너 활성화
 - 대기: 약 15초 (Kafka 브로커 준비)
@@ -101,17 +123,17 @@
 - 검증: `http://localhost:8085/api/auth/login` 핑 응답 확인
 
 ### Phase 3: A파트 AI Serving 기동
-- 경로: `C:\dev\data_pipeline_ai-main\ai-data-pipeline\`
+- 경로: `C:\dev\ai-data-pipeline\`
 - 명령어: `uvicorn api_serving.main:app --host 0.0.0.0 --port 8000`
 - 역할: FastAPI 추론 서버 기동 (B파트가 ANFIS 미션 생성 요청 시 호출)
 
 ### Phase 4: 가상 ESP32 센서 가동
-- 경로: `C:\dev\data_pipeline_ai-main\ai-data-pipeline\simulators\`
+- 경로: `C:\dev\ai-data-pipeline\simulators\`
 - 명령어: `python virtual_esp32_sensor.py`
 - 역할: 1만 가구 가상 데이터를 10,000 TPS로 Kafka에 발사
 
 ### Phase 5: A파트 Ingestion Worker 기동
-- 경로: `C:\dev\data_pipeline_ai-main\ai-data-pipeline\workers\`
+- 경로: `C:\dev\ai-data-pipeline\workers\`
 - 명령어: `python ingestion_api.py`
 - 역할: Kafka 1차 필터링/전처리 후 분산 저장소 라우팅
 
@@ -155,17 +177,18 @@ backend_service_client/
 │   │
 │   ├── api/                            # [백엔드 통신 계층]
 │   │   ├── apiClient.js                # JWT 토큰 자동 부착 axios 클라이언트
-│   │   └── useWebSocket.js             # 실시간 전력 데이터 수신 훅 (96슬롯)
+│   │   └── useWebSocket.js             # 실시간 전력 데이터 수신 훅 (24슬롯)
 │   │
 │   ├── components/
 │   │   └── Modals.js                   # 확인/토스트/QR 바텀시트 공용 컴포넌트
 │   │
 │   ├── screens/                        # [화면 라우트 계층]
-│   │   ├── HomeScreen.js               # 실시간 도넛 + 96슬롯 시간대별 라인 차트
+│   │   ├── HomeScreen.js               # 실시간 도넛 + 24슬롯 시간대별 라인 차트
 │   │   ├── DREventScreen.js            # DR 이벤트 참여/알림/이력 조회
 │   │   ├── MissionScreen.js            # 카테고리별 미션 진행도 + 자동 포인트 적립
 │   │   ├── PointScreen.js              # 포인트 적립/사용 내역 + QR 결제 바텀시트
 │   │   ├── MyPageScreen.js             # 통계/에코 레벨/IoT 기기/설정/로그아웃
+│   │   ├── UsageAnalysisScreen.js      # InfluxDB 시계열 일별 추이 분석 화면 (신규)
 │   │   ├── LoginScreen.js              # JWT 로그인 + Shake 에러 애니메이션
 │   │   ├── SignUpScreen.js             # 2단계 회원가입 (위치/가구 칩 선택)
 │   │   └── SignUpCompleteScreen.js     # 가입 완료 스프링 애니메이션
@@ -185,7 +208,8 @@ backend_service_client/
 │   │   │   ├── JwtUtil.java            # JWT 토큰 생성/검증 유틸리티
 │   │   │   ├── JwtAuthenticationFilter.java # 요청별 JWT 검증 필터
 │   │   │   ├── WebSocketConfig.java    # WebSocket 핸들러 엔드포인트 등록
-│   │   │   └── DataInitializer.java    # 서버 시작 시 테스트 데이터 자동 시드
+│   │   │   ├── DataInitializer.java    # 서버 시작 시 테스트 데이터 자동 시드
+│   │   │   └── DRDataInitializer.java  # ApplicationReady 시 ACTIVE DR 이벤트 동적 시딩 (신규)
 │   │   │
 │   │   ├── controller/                 # [REST API 엔드포인트 계층]
 │   │   │   ├── AuthController.java     # 로그인/회원가입/토큰 발급
@@ -194,10 +218,12 @@ backend_service_client/
 │   │   │   ├── MissionController.java  # 카테고리별 미션 조회/진행/완료
 │   │   │   ├── PointController.java    # 포인트 적립/사용/잔액
 │   │   │   └── ProfileController.java  # 프로필/통계/월간 리포트
+│   │   │       # ※ EnergyController에 /timeseries, MissionController에 /generate 추가
 │   │   │
 │   │   ├── dto/                        # [요청/응답 DTO 계층]
 │   │   │   ├── AuthDto.java            # 로그인/회원가입 페이로드
-│   │   │   ├── AppDto.java             # 96슬롯 hourlyActual 등 공통 페이로드
+│   │   │   ├── AppDto.java             # 24슬롯 hourlyActual / TimeseriesPoint 등 공통 페이로드
+│   │   │   ├── AiMissionResponse.java  # FastAPI ANFIS 미션 응답 DTO (신규)
 │   │   │   └── ProfileDto.java         # 통계/레벨/리포트 페이로드
 │   │   │
 │   │   ├── entity/                     # [JPA 엔티티 계층]
@@ -215,12 +241,16 @@ backend_service_client/
 │   │   └── service/                    # [비즈니스 로직 계층]
 │   │       ├── AuthService.java                # 인증/회원가입 로직
 │   │       ├── EnergyService.java              # 전력 데이터 조회/집계
+│   │       ├── AiEngineClient.java             # FastAPI 연동(미션 생성/LSTM 예측/시계열) + Fallback (신규)
 │   │       ├── KafkaConsumerService.java       # A파트 Kafka 토픽 구독 및 영속화
 │   │       ├── EnergyWebSocketHandler.java     # 클라이언트 실시간 푸시 핸들러
 │   │       ├── DREventService.java             # DR 이벤트 도메인 로직
 │   │       ├── MissionService.java             # 미션 진행/완료/포인트 적립 트리거
 │   │       ├── PointService.java               # 포인트 적립/사용/잔액 계산
 │   │       └── ProfileService.java             # 통계/리포트 집계 로직
+│   │   │
+│   │   └── exception/
+│   │       └── ExternalPaymentException.java   # Saga 보상 트랜잭션용 커스텀 예외 (신규)
 │   │
 │   ├── src/main/resources/
 │   │   └── application.yml             # MySQL/Kafka/JWT/포트 통합 설정
