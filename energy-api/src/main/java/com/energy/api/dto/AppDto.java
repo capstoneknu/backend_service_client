@@ -151,6 +151,14 @@ public class AppDto {
         private Integer drSuccess;
     }
 
+    // ======== 시계열 분석 응답 (InfluxDB 추이) ========
+    @Getter @Setter @Builder
+    @NoArgsConstructor @AllArgsConstructor
+    public static class TimeseriesPoint {
+        private String time;
+        private Double value;
+    }
+
     // ======== 공통 API 응답 ========
     @Getter @Setter @Builder
     @NoArgsConstructor @AllArgsConstructor

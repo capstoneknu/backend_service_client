@@ -76,6 +76,10 @@ export const authAPI = {
 // ==============================
 export const energyAPI = {
   getDashboard: () => request('/api/energy/dashboard'),
+
+  // InfluxDB 시계열 추이 (시계열 분석 화면)
+  getTimeseries: (deviceId = 'USER_0000', window = '1d') =>
+    request(`/api/energy/timeseries?deviceId=${encodeURIComponent(deviceId)}&window=${encodeURIComponent(window)}`),
 };
 
 // ==============================
