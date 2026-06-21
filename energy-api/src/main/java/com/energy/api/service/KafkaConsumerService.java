@@ -36,17 +36,32 @@ public class KafkaConsumerService {
     public void consume(String message) {
         try {
             JsonNode json = objectMapper.readTree(message);
-            String deviceId = json.get("device_id").asText();
+            String deviceIdStr = json.get("device_id").asText();
             double kwhUsage = json.get("kwh_usage").asDouble();
-
-            // ⭐ 데이터의 timestamp가 과거 날짜(2026-04-14 등)라서
-            //    실제 수신 시점(지금)으로 저장하여 오늘 데이터로 집계
-            LocalDateTime recordedAt = LocalDateTime.now();
-
             double powerKw = kwhUsage * 60;
+
+            // =================================================================
+            // [추가] 출처 추적 식별 로그 및 ID 매핑
+            // =================================================================
+            if ("99999".equals(deviceIdStr)) {
+                // 실제 esp32(디바이스 id : 99999)에서 쏘는 데이터 식별
+                log.info("[PHYSICAL SENSOR] Inbound: REAL_ESP32, power={}kW", String.format("%.2f", powerKw));
+                // 프론트엔드(React Native) 앱 연동을 위해 내부적으로 1번 유저로 매핑
+                deviceIdStr = "1"; 
+            } else if ("1".equals(deviceIdStr)) {
+                // 기존 가상 esp32 센서에서 쏘는 데이터 식별
+                log.info("[VIRTUAL SENSOR] Inbound: device=1, power={}kW", String.format("%.2f", powerKw));
+            } else {
+                // 1번(가상)과 99999번(물리) 데이터 외 타 가구 9,998대의 데이터는 여기서 드롭
+                return; 
+            }
+
+            // 이후 로직은 물리/가상 모두 deviceIdStr이 "1"이 된 상태로 정상 진행
+            Long incomingUserId = 1L;
+            LocalDateTime recordedAt = LocalDateTime.now();
             long now = System.currentTimeMillis();
 
-            // DB 저장 (5초 간격)
+            // DB 저장 (5초 간격) 
             long lastDb = lastDbSaveTime.get();
             if (now - lastDb >= DB_SAVE_INTERVAL_MS) {
                 if (lastDbSaveTime.compareAndSet(lastDb, now)) {
@@ -72,7 +87,7 @@ public class KafkaConsumerService {
                     String wsPayload = objectMapper.writeValueAsString(
                             java.util.Map.of(
                                     "type", "ENERGY_UPDATE",
-                                    "deviceId", deviceId,
+                                    "deviceId", deviceIdStr,
                                     "currentPower", powerKw,
                                     "kwhUsage", kwhUsage,
                                     "timestamp", recordedAt.toString()
@@ -80,7 +95,7 @@ public class KafkaConsumerService {
                     );
                     webSocketHandler.broadcast(wsPayload);
                     log.info("⚡ Broadcast: device={}, power={}kW",
-                            deviceId, String.format("%.2f", powerKw));
+                            deviceIdStr, String.format("%.2f", powerKw));
                 }
             }
 

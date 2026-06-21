@@ -5,7 +5,7 @@ import {
 import {useMissionStore} from '../store/store';
 import {ConfirmModal, ToastModal} from '../components/Modals';
 
-const categories = ['전체', 'DR', '냉난방', '가전', '종합'];
+const categories = ['전체', 'AI', '냉난방', '가전', '종합'];
 
 const MissionCard = ({mission, onPress}) => {
   const percent = mission.total > 0 ? (mission.progress / mission.total) * 100 : 0;
@@ -28,7 +28,7 @@ const MissionCard = ({mission, onPress}) => {
         <View style={[styles.pointBadge, isCompleted && {backgroundColor: '#DCFCE7'}]}>
           <Text style={styles.pointBadgeText}>+{mission.points}P</Text>
         </View>
-        <Text style={styles.chevron}>›</Text>
+        {!isCompleted && <Text style={styles.chevron}>›</Text>}
       </View>
       <View style={styles.missionProgress}>
         <View style={styles.progressBg}>
@@ -55,6 +55,9 @@ const MissionScreen = () => {
   const [confirmModal, setConfirmModal] = useState({visible: false, mission: null});
   const [toast, setToast] = useState({visible: false, message: '', type: 'success'});
 
+  // [추가] 완료된 미션 보관함 상태 관리
+  const [isArchiveView, setIsArchiveView] = useState(false);
+
   // API에서 데이터 로드
   useEffect(() => {
     fetchMissions();
@@ -63,6 +66,11 @@ const MissionScreen = () => {
   const completedCount = getCompletedCount();
   const earnedPoints = getEarnedPoints();
   const streakDays = 3;
+
+  // [추가] 프론트엔드 메모리 단에서 상태별 리스트 분리
+  const activeMissions = missions.filter(m => !m.completed);
+  const completedMissions = missions.filter(m => m.completed);
+  const displayMissions = isArchiveView ? completedMissions : activeMissions;
 
   const handleMissionPress = (mission) => {
     if (mission.completed) return;
@@ -77,7 +85,7 @@ const MissionScreen = () => {
     const result = await incrementProgress(mission.id);
     if (result.success) {
       const msg = result.data?.completed
-        ? `🎉 "${mission.title}" 미션 완료! +${mission.points}P 적립!`
+        ? `"${mission.title}" 미션 완료! +${mission.points}P 적립!`
         : `✓ 진행도가 업데이트되었습니다`;
       showToast(msg, result.data?.completed ? 'success' : 'info');
     } else {
@@ -93,8 +101,26 @@ const MissionScreen = () => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.pageTitle}>에너지 미션</Text>
-        <Text style={styles.pageSubtitle}>미션을 달성하고 포인트를 적립하세요</Text>
+
+
+        {/* [수정] 동적 헤더 및 보관함 토글 버튼 UI */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.pageTitle}>{isArchiveView ? '완료된 미션' : '에너지 미션'}</Text>
+            <Text style={styles.pageSubtitle}>
+              {isArchiveView ? '지금까지 달성한 기록입니다' : '미션을 달성하고 포인트를 적립하세요'}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={[styles.archiveBtn, isArchiveView && styles.archiveBtnActive]} 
+            onPress={() => setIsArchiveView(!isArchiveView)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.archiveBtnText, isArchiveView && styles.archiveBtnTextActive]}>
+              {isArchiveView ? '진행 중 보기' : '미션보관함 🗃️'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -128,16 +154,19 @@ const MissionScreen = () => {
           </View>
         </ScrollView>
 
-        {isLoading && missions.length === 0 ? (
+        {/* [수정] 필터링된 displayMissions 배열 렌더링 */}
+        {isLoading && displayMissions.length === 0 ? (
           <ActivityIndicator size="large" color="#22C55E" style={{paddingVertical: 30}} />
-        ) : missions.length > 0 ? (
-          missions.map(mission => (
+        ) : displayMissions.length > 0 ? (
+          displayMissions.map(mission => (
             <MissionCard key={mission.id} mission={mission} onPress={handleMissionPress} />
           ))
         ) : (
           <View style={styles.emptyState}>
             <Text style={{fontSize: 40}}>📋</Text>
-            <Text style={styles.emptyText}>해당 카테고리에 미션이 없습니다</Text>
+            <Text style={styles.emptyText}>
+              {isArchiveView ? '아직 완료된 미션이 없습니다' : '현재 진행 가능한 미션이 없습니다'}
+            </Text>
           </View>
         )}
         <View style={{height: 20}} />
@@ -157,6 +186,14 @@ const MissionScreen = () => {
 const styles = StyleSheet.create({
   container: {flex: 1, backgroundColor: '#F9FAFB'},
   scrollContent: {paddingHorizontal: 16, paddingTop: 50, paddingBottom: 20},
+
+  // [추가] 헤더 레이아웃
+  headerRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16},
+  archiveBtn: {backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, borderWidth: 1, borderColor: '#E5E7EB'},
+  archiveBtnActive: {backgroundColor: '#111827', borderColor: '#111827'},
+  archiveBtnText: {fontSize: 12, fontWeight: '600', color: '#4B5563'},
+  archiveBtnTextActive: {color: '#FFFFFF'},
+
   pageTitle: {fontSize: 24, fontWeight: '700', color: '#111827'},
   pageSubtitle: {fontSize: 14, color: '#6B7280', marginTop: 4, marginBottom: 16},
   statsRow: {flexDirection: 'row', gap: 10, marginBottom: 16},

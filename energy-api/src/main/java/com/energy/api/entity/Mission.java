@@ -34,6 +34,14 @@ public class Mission {
 
     private String icon;             // 이모지 아이콘
 
+    // [추가] ANFIS XAI 추론 근거 저장 필드 (데이터 잘림 방지를 위해 length = 500 설정)
+    @Column(length = 500)
+    private String explainabilityLog; 
+
+    // 개인화 미션 식별자 (null = 전체 공용 미션, 값이 있으면 개인 전용 미션)
+    @Column(name = "target_user_id")
+    private Long targetUserId;
+
     @Builder.Default
     private Boolean active = true;
 }

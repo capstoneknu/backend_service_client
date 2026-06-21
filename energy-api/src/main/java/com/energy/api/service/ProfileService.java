@@ -1,6 +1,6 @@
 package com.energy.api.service;
 
-import com.energy.api.dto.ProfileDto;
+import com.energy.api.dto.AppDto;
 import com.energy.api.entity.User;
 import com.energy.api.repository.DRParticipationRepository;
 import com.energy.api.repository.EnergyDataRepository;
@@ -29,7 +29,7 @@ public class ProfileService {
     private static final double TREE_ABSORB_KG = 22.0;
     private static final int POINTS_PER_LEVEL = 1000;
 
-    public ProfileDto.ProfileResponse getProfile(Long userId) {
+    public AppDto.ProfileResponse getProfile(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
@@ -39,7 +39,7 @@ public class ProfileService {
         LocalDate lastMonthStart = thisMonthStart.minusMonths(1);
         LocalDate lastMonthEnd = lastMonthStart.withDayOfMonth(lastMonthStart.lengthOfMonth());
 
-        // ====== 1. 월 사용량 (안전하게) ======
+        // ====== 1. 월 사용량 ======
         double thisMonthUsed = 0.0;
         double lastMonthUsed = 0.0;
         try {
@@ -47,7 +47,6 @@ public class ProfileService {
             if (v1 != null) thisMonthUsed = v1;
             Double v2 = energyDataRepository.sumKwhByUserAndDateRange(user, lastMonthStart, lastMonthEnd);
             if (v2 != null) lastMonthUsed = v2;
-            log.info("📊 [Profile] 월 사용량: 이번달={}, 지난달={}", thisMonthUsed, lastMonthUsed);
         } catch (Exception e) {
             log.warn("📊 [Profile] 월 사용량 조회 실패: {}", e.getMessage());
         }
@@ -64,61 +63,40 @@ public class ProfileService {
             prevMonthSavingPercent = (int) Math.max(0, Math.round(pct));
         }
 
-        // ====== 2. DR 참여 (안전하게) ======
+        // ====== 2. DR 참여 ======
         long drParticipation = 0;
         long drSuccess = 0;
         try {
             drParticipation = drParticipationRepository.countByUser(user);
             drSuccess = drParticipationRepository.countSuccessByUser(user);
-            log.info("📊 [Profile] DR 참여: {}/{}", drSuccess, drParticipation);
         } catch (Exception e) {
             log.warn("📊 [Profile] DR 참여 조회 실패: {}", e.getMessage());
         }
 
-        // ====== 3. 포인트 (안전하게 - PointHistory 실패 시 user.getTotalPoints() fallback) ======
-        int totalPoints = 0;
-        try {
-            Long sumPoints = pointHistoryRepository.sumNetPointsByUser(user);
-            if (sumPoints != null && sumPoints > 0) {
-                totalPoints = sumPoints.intValue();
-                log.info("📊 [Profile] 포인트 (PointHistory): {}P", totalPoints);
-            } else {
-                // PointHistory 결과가 0이면 user.totalPoints fallback
-                Integer userPoints = user.getTotalPoints();
-                totalPoints = userPoints != null ? userPoints : 0;
-                log.info("📊 [Profile] 포인트 (User.totalPoints): {}P", totalPoints);
-            }
-        } catch (Exception e) {
-            log.warn("📊 [Profile] PointHistory 조회 실패, User.totalPoints 사용: {}", e.getMessage());
-            Integer userPoints = user.getTotalPoints();
-            totalPoints = userPoints != null ? userPoints : 0;
-        }
+        // ====== 3. 포인트 및 에코 레벨 ======
+        int totalPoints = user.getTotalPoints() != null ? user.getTotalPoints() : 0;
 
-        // 에코 레벨 계산
         int ecoLevel = (totalPoints / POINTS_PER_LEVEL) + 1;
         int pointsInLevel = totalPoints % POINTS_PER_LEVEL;
         int ecoLevelProgress = pointsInLevel * 100 / POINTS_PER_LEVEL;
         int pointsToNextLevel = POINTS_PER_LEVEL - pointsInLevel;
 
-        log.info("📊 [Profile] 사용자={}, 레벨=Lv.{}, 포인트={}P",
-                user.getName(), ecoLevel, totalPoints);
-
-        // DTO 조립
-        ProfileDto.Stats stats = ProfileDto.Stats.builder()
-                .totalSaving((int) Math.round(totalSaving))
+        // ====== 4. 중첩 객체(Nested Object) 복구 ======
+        AppDto.Stats stats = AppDto.Stats.builder()
+                .totalSaving((double) Math.round(totalSaving))
                 .co2Reduction(round(co2Reduction, 1))
                 .treesPlanted(treesPlanted)
                 .build();
 
-        ProfileDto.MonthlyReport monthlyReport = ProfileDto.MonthlyReport.builder()
-                .target((int) MONTHLY_TARGET_KWH)
-                .used((int) Math.round(thisMonthUsed))
+        AppDto.MonthlyReport monthlyReport = AppDto.MonthlyReport.builder()
+                .target(MONTHLY_TARGET_KWH)
+                .used((double) Math.round(thisMonthUsed))
                 .prevMonthSaving(prevMonthSavingPercent)
                 .drParticipation((int) drParticipation)
                 .drSuccess((int) drSuccess)
                 .build();
 
-        return ProfileDto.ProfileResponse.builder()
+        return AppDto.ProfileResponse.builder()
                 .name(user.getName())
                 .location(user.getLocation())
                 .household(user.getHousehold())
