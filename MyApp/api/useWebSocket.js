@@ -1,7 +1,10 @@
 import {useEffect, useRef, useCallback} from 'react';
 import {useEnergyStore} from '../store/store';
+import { getToken } from '../api/apiClient'; // getToken 추가
 
-const WS_URL = 'ws://10.0.2.2:8085/ws/energy';
+//[수정 전] const WS_URL = 'ws://10.0.2.2:8085/ws/energy';
+// [수정 후] AWS EC2 퍼블릭 IP 매핑 
+const WS_URL = 'ws://3.37.149.164:8085/ws/energy';
 const UPDATE_INTERVAL_MS = 60 * 1000; // 1분
 
 export const useEnergyWebSocket = () => {
@@ -19,7 +22,13 @@ export const useEnergyWebSocket = () => {
 
   const connect = useCallback(() => {
     try {
-      const ws = new WebSocket(WS_URL);
+      //[기존] const ws = new WebSocket(WS_URL);
+
+      //[변경]
+      const currentToken = getToken();
+      const finalWsUrl = currentToken ? `${WS_URL}?token=${currentToken}` : WS_URL;
+      
+      const ws = new WebSocket(finalWsUrl);
 
       ws.onopen = () => {
         console.log('✅ WebSocket 연결됨');
