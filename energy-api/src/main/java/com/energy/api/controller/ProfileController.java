@@ -21,7 +21,6 @@ public class ProfileController {
     private final UserRepository userRepository;
 
     @GetMapping
-    // [수정] ProfileDto.ProfileResponse -> AppDto.ProfileResponse 로 변경
     public AppDto.ApiResponse<AppDto.ProfileResponse> getProfile(Authentication auth) {
         Object principal = auth.getPrincipal();
         log.info("📍 [Profile] 요청 받음, principal={}", principal);

@@ -2,7 +2,10 @@
 // API 설정
 // ==============================
 
-const BASE_URL = 'http://10.0.2.2:8085';
+//[수정 전] 로컬 환경용 const BASE_URL = 'http://10.0.2.2:8085';
+
+// [수정 후] AWS EC2 퍼블릭 IP 매핑
+const BASE_URL = 'http://3.37.149.164:8085';
 
 let authToken = null;
 
@@ -37,10 +40,18 @@ const request = async (endpoint, options = {}) => {
       headers,
     });
 
-    const data = await response.json();
+    //[기존] const data = await response.json();
+    // 변경된 부분: 빈 응답(Empty Body) 파싱 에러 방어 로직
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+
 
     if (!response.ok) {
-      throw new Error(data.message || '요청에 실패했습니다.');
+      // 401/403 에러 발생 시 처리
+      if (response.status === 401 || response.status === 403) {
+         throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+      }
+      throw new Error(data.message || `요청에 실패했습니다. (상태 코드: ${response.status})`);
     }
 
     return data;
