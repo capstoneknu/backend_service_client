@@ -15,6 +15,7 @@ import DREventScreen from './screens/DREventScreen';
 import MissionScreen from './screens/MissionScreen';
 import PointScreen from './screens/PointScreen';
 import MyPageScreen from './screens/MyPageScreen';
+import UsageAnalysisScreen from './screens/UsageAnalysisScreen';
 
 // Store
 import {useAuthStore} from './store/authStore';
@@ -73,6 +74,17 @@ const MainTabs = () => {
   );
 };
 
+// ---- Main Stack (탭 + 하위 상세 화면) ----
+const MainStack = () => {
+  return (
+    <Stack.Navigator
+      screenOptions={{headerShown: false, animation: 'slide_from_right'}}>
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen name="UsageAnalysis" component={UsageAnalysisScreen} />
+    </Stack.Navigator>
+  );
+};
+
 // ---- Auth Stack Navigator ----
 const AuthStack = () => {
   return (
@@ -98,7 +110,7 @@ const App = () => {
 
   return (
     <NavigationContainer>
-      {isLoggedIn ? <MainTabs /> : <AuthStack />}
+      {isLoggedIn ? <MainStack /> : <AuthStack />}
     </NavigationContainer>
   );
 };

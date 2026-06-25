@@ -13,8 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
-// [기존] import java.time.LocalDateTime;
-// [수정] 시스템이 어떤 클라우드 리전(미국, 유럽 등)에 배포되더라도한국 시간(KST)으로 동작하도록
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
@@ -31,7 +29,7 @@ public class EnergyService {
 
     private final EnergyDataRepository energyDataRepository;
     private final UserRepository userRepository;
-
+    
     // 외부 AI 예측 엔진 통신을 위한 RestTemplate 직접 바인딩
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -59,7 +57,6 @@ public class EnergyService {
             return buildEmptyResponse();
         }
 
-        // [기존] LocalDate today = LocalDate.now();
         // [수정] 시간 기준을 OS 기본값이 아닌 KST로 강제 격리
         LocalDate today = LocalDate.now(KST_ZONE);
         LocalDate yesterday = today.minusDays(1);
@@ -118,7 +115,6 @@ public class EnergyService {
      * 미래 시간은 0.0으로 패딩하여 프론트엔드 SVG 렌더링 결함을 차단함.
      */
     private List<Double> buildHourlyActualDynamic(User user, LocalDate today) {
-        //[기존] int currentHour = LocalDateTime.now().getHour();
         //[수정] 기준의 현재 시간 도출
         int currentHour = ZonedDateTime.now(KST_ZONE).getHour();
 
